@@ -1,632 +1,784 @@
--- doors hack v3 - mobile drag + more esp
-local plr = game.Players.LocalPlayer
-local rs = game:GetService("RunService")
-local uis = game:GetService("UserInputService")
-local coregui = game:GetService("CoreGui")
-local tweens = game:GetService("TweenService")
+-- Complete Doors Hack Script v2.1 - With Simplified Auto Collection
+-- Created with enhanced ESP, teleportation safety, entity protection, and auto collection
 
--- cleanup old stuff
-if coregui:FindFirstChild("doorshack") then
-    coregui.doorshack:Destroy()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Update character references when respawning
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
+end)
+
+-- Clean up existing GUI
+pcall(function()
+    CoreGui:FindFirstChild("DoorsHackV2"):Destroy()
+end)
+
+-- Variables
+local espObjects = {}
+local connections = {}
+local isMinimized = false
+local originalLighting = {}
+local collectibleItems = {} -- Track collectible items
+local collectedItems = {} -- Track already collected items to prevent spam
+
+-- Settings
+local settings = {
+    doorESP = false,
+    keyESP = false,
+    goldESP = false,
+    itemESP = false,
+    leverESP = false,
+    chestESP = false,
+    antiRush = false,
+    antiAmbush = false,
+    antiSeek = false,
+    antiScreech = false,
+    antiEyes = false,
+    antiHalt = false,
+    entityNotifications = true,
+    fullbright = false,
+    autoCollect = false
+}
+
+print("Creating Doors Hack GUI...")
+
+-- Create main GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DoorsHackV2"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = CoreGui
+
+-- Main frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 320, 0, 420) -- Adjusted height
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+mainFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+mainFrame.BorderSizePixel = 2
+mainFrame.BorderColor3 = Color3.new(0.3, 0.5, 0.8)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+print("Main frame created")
+
+-- Title bar
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+-- Title text
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -60, 1, 0)
+titleText.Position = UDim2.new(0, 5, 0, 0)
+titleText.BackgroundTransparency = 1
+titleText.Text = "Doors Hack v2.1 - Auto Collect"
+titleText.TextColor3 = Color3.new(1, 1, 1)
+titleText.TextSize = 14
+titleText.Font = Enum.Font.SourceSansBold
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+-- Minimize button
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+minimizeBtn.Position = UDim2.new(1, -55, 0, 2.5)
+minimizeBtn.BackgroundColor3 = Color3.new(1, 0.6, 0)
+minimizeBtn.BorderSizePixel = 0
+minimizeBtn.Text = "-"
+minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+minimizeBtn.TextSize = 16
+minimizeBtn.Font = Enum.Font.SourceSansBold
+minimizeBtn.Parent = titleBar
+
+-- Close button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 25, 0, 25)
+closeBtn.Position = UDim2.new(1, -28, 0, 2.5)
+closeBtn.BackgroundColor3 = Color3.new(1, 0.2, 0.2)
+closeBtn.BorderSizePixel = 0
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.TextSize = 14
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.Parent = titleBar
+
+-- Content frame
+local contentFrame = Instance.new("ScrollingFrame")
+contentFrame.Name = "ContentFrame"
+contentFrame.Size = UDim2.new(1, -10, 1, -40)
+contentFrame.Position = UDim2.new(0, 5, 0, 35)
+contentFrame.BackgroundTransparency = 1
+contentFrame.BorderSizePixel = 0
+contentFrame.ScrollBarThickness = 6
+contentFrame.ScrollBarImageColor3 = Color3.new(0.5, 0.5, 0.5)
+contentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+contentFrame.Parent = mainFrame
+
+-- Layout for content
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 5)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = contentFrame
+
+print("Content frame and layout created")
+
+-- Function to create section headers
+local function createSection(title, order)
+    local section = Instance.new("Frame")
+    section.Name = title .. "Section"
+    section.Size = UDim2.new(1, -10, 0, 25)
+    section.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+    section.BorderSizePixel = 1
+    section.BorderColor3 = Color3.new(0.4, 0.6, 1)
+    section.LayoutOrder = order
+    section.Parent = contentFrame
+    
+    local sectionTitle = Instance.new("TextLabel")
+    sectionTitle.Size = UDim2.new(1, -5, 1, 0)
+    sectionTitle.Position = UDim2.new(0, 5, 0, 0)
+    sectionTitle.BackgroundTransparency = 1
+    sectionTitle.Text = title
+    sectionTitle.TextColor3 = Color3.new(0.4, 0.6, 1)
+    sectionTitle.TextSize = 12
+    sectionTitle.Font = Enum.Font.SourceSansBold
+    sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+    sectionTitle.Parent = section
+    
+    return section
 end
 
--- vars
-local espstuff = {}
-local textlabels = {}
-local dooresp = false
-local keyesp = false
-local coinesp = false
-local bookesp = false
-local leversp = false
-local chestesp = false
-local entityesp = false
-local noclip = false
-local fly = false
-local god = false
-
--- main gui
-local sg = Instance.new("ScreenGui")
-sg.Name = "doorshack"
-sg.ResetOnSpawn = false
-sg.Parent = coregui
-
--- check if mobile
-local mobile = uis.TouchEnabled and not uis.KeyboardEnabled
-
--- main frame
-local main = Instance.new("Frame")
-main.Size = mobile and UDim2.new(0,320,0,520) or UDim2.new(0,360,0,480)
-main.Position = UDim2.new(0.5, mobile and -160 or -180, 0.5, mobile and -260 or -240)
-main.BackgroundColor3 = Color3.new(0.08, 0.08, 0.12)
-main.BorderSizePixel = 0
-main.Active = true
-main.Parent = sg
-
--- mobile drag support
-local dragging = false
-local dragStart = nil
-local startPos = nil
-
-local function updateInput(input)
-    local delta = input.Position - dragStart
-    main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+-- Function to create toggle buttons
+local function createToggle(text, settingKey, color, order)
+    local toggle = Instance.new("Frame")
+    toggle.Name = text .. "Toggle"
+    toggle.Size = UDim2.new(1, -10, 0, 30)
+    toggle.BackgroundColor3 = Color3.new(0.12, 0.12, 0.12)
+    toggle.BorderSizePixel = 1
+    toggle.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
+    toggle.LayoutOrder = order
+    toggle.Parent = contentFrame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -50, 1, 0)
+    label.Position = UDim2.new(0, 5, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextSize = 11
+    label.Font = Enum.Font.SourceSans
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = toggle
+    
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 40, 0, 20)
+    button.Position = UDim2.new(1, -45, 0.5, -10)
+    button.BackgroundColor3 = settings[settingKey] and color or Color3.new(0.3, 0.3, 0.3)
+    button.BorderSizePixel = 0
+    button.Text = settings[settingKey] and "ON" or "OFF"
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextSize = 9
+    button.Font = Enum.Font.SourceSansBold
+    button.Parent = toggle
+    
+    button.MouseButton1Click:Connect(function()
+        settings[settingKey] = not settings[settingKey]
+        button.BackgroundColor3 = settings[settingKey] and color or Color3.new(0.3, 0.3, 0.3)
+        button.Text = settings[settingKey] and "ON" or "OFF"
+        print(text .. " set to: " .. tostring(settings[settingKey]))
+    end)
+    
+    return toggle
 end
 
-main.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+-- Function to create slider
+local function createSlider(text, settingKey, minVal, maxVal, order)
+    local slider = Instance.new("Frame")
+    slider.Name = text .. "Slider"
+    slider.Size = UDim2.new(1, -10, 0, 40)
+    slider.BackgroundColor3 = Color3.new(0.12, 0.12, 0.12)
+    slider.BorderSizePixel = 1
+    slider.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
+    slider.LayoutOrder = order
+    slider.Parent = contentFrame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -5, 0, 20)
+    label.Position = UDim2.new(0, 5, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text .. ": " .. settings[settingKey]
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextSize = 11
+    label.Font = Enum.Font.SourceSans
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = slider
+    
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(1, -10, 0, 15)
+    sliderBar.Position = UDim2.new(0, 5, 0, 22)
+    sliderBar.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    sliderBar.BorderSizePixel = 0
+    sliderBar.Parent = slider
+    
+    local sliderButton = Instance.new("TextButton")
+    sliderButton.Size = UDim2.new(0, 15, 1, 0)
+    sliderButton.Position = UDim2.new((settings[settingKey] - minVal) / (maxVal - minVal), -7.5, 0, 0)
+    sliderButton.BackgroundColor3 = Color3.new(0.4, 0.6, 1)
+    sliderButton.BorderSizePixel = 0
+    sliderButton.Text = ""
+    sliderButton.Parent = sliderBar
+    
+    local dragging = false
+    
+    sliderButton.MouseButton1Down:Connect(function()
         dragging = true
-        dragStart = input.Position
-        startPos = main.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mouse = Players.LocalPlayer:GetMouse()
+            local relativeX = math.clamp(mouse.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
+            local percentage = relativeX / sliderBar.AbsoluteSize.X
+            
+            sliderButton.Position = UDim2.new(percentage, -7.5, 0, 0)
+            settings[settingKey] = math.floor(minVal + (maxVal - minVal) * percentage)
+            label.Text = text .. ": " .. settings[settingKey]
+        end
+    end)
+    
+    return slider
+end
 
-main.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if dragging then
-            updateInput(input)
+print("Creating toggles...")
+
+-- Create sections and toggles
+createSection("ESP Features", 1)
+createToggle("Door ESP", "doorESP", Color3.new(0, 1, 0.4), 2)
+createToggle("Key ESP", "keyESP", Color3.new(1, 0.84, 0), 3)
+createToggle("Gold ESP", "goldESP", Color3.new(1, 0.65, 0), 4)
+createToggle("Item ESP", "itemESP", Color3.new(0.4, 0.6, 1), 5)
+createToggle("Lever ESP", "leverESP", Color3.new(0.8, 0.4, 1), 6)
+createToggle("Chest ESP", "chestESP", Color3.new(1, 0.4, 0.8), 7)
+
+createSection("Auto Collection", 8)
+createToggle("Auto Collect & Open Everything", "autoCollect", Color3.new(0, 1, 0), 9)
+
+createSection("Entity Protection", 10)
+createToggle("Anti Rush (TP to Safety)", "antiRush", Color3.new(1, 0.2, 0.2), 11)
+createToggle("Anti Ambush (TP to Safety)", "antiAmbush", Color3.new(1, 0.4, 0.2), 12)
+createToggle("Anti Seek (TP Forward)", "antiSeek", Color3.new(0.6, 0, 0.6), 13)
+createToggle("Anti Screech (Auto Click)", "antiScreech", Color3.new(1, 1, 0.2), 14)
+createToggle("Anti Eyes (Look Away)", "antiEyes", Color3.new(1, 0, 1), 15)
+createToggle("Anti Halt (Stop Moving)", "antiHalt", Color3.new(0, 1, 1), 16)
+createToggle("Entity Notifications", "entityNotifications", Color3.new(0.4, 1, 1), 17)
+
+createSection("Visual Features", 18)
+createToggle("Fullbright", "fullbright", Color3.new(1, 1, 0.4), 19)
+
+print("Toggles created, updating canvas size...")
+
+-- Update canvas size
+task.wait(0.1) -- Wait for layout to update
+local totalHeight = layout.AbsoluteContentSize.Y
+contentFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight + 20)
+
+print("Canvas size updated to: " .. totalHeight)
+
+-- ESP Functions
+local function clearESP()
+    for _, obj in pairs(espObjects) do
+        if obj and obj.Parent then
+            pcall(function() obj:Destroy() end)
         end
     end
-end)
+    espObjects = {}
+end
 
--- rounded corners
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0,12)
-corner.Parent = main
-
--- header bar
-local topbar = Instance.new("Frame")
-topbar.Size = UDim2.new(1,0,0,60)
-topbar.BackgroundColor3 = Color3.new(0.25, 0.15, 0.45)
-topbar.BorderSizePixel = 0
-topbar.Parent = main
-
-local topcorner = Instance.new("UICorner")
-topcorner.CornerRadius = UDim.new(0,12)
-topcorner.Parent = topbar
-
--- fix bottom of header
-local fix = Instance.new("Frame")
-fix.Size = UDim2.new(1,0,0,12)
-fix.Position = UDim2.new(0,0,1,-12)
-fix.BackgroundColor3 = Color3.new(0.25, 0.15, 0.45)
-fix.BorderSizePixel = 0
-fix.Parent = topbar
-
--- title stuff
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,-80,0,25)
-title.Position = UDim2.new(0,15,0,10)
-title.BackgroundTransparency = 1
-title.Text = "doors hack"
-title.TextColor3 = Color3.new(1,1,1)
-title.TextSize = mobile and 16 or 18
-title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = topbar
-
-local subtitle = Instance.new("TextLabel")
-subtitle.Size = UDim2.new(1,-80,0,20)
-subtitle.Position = UDim2.new(0,15,0,30)
-subtitle.BackgroundTransparency = 1
-subtitle.Text = "mobile drag support"
-subtitle.TextColor3 = Color3.new(0.7,0.7,0.9)
-subtitle.TextSize = mobile and 11 or 12
-subtitle.Font = Enum.Font.Gotham
-subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.Parent = topbar
-
--- minimize btn
-local minbtn = Instance.new("TextButton")
-minbtn.Size = UDim2.new(0,30,0,30)
-minbtn.Position = UDim2.new(1,-65,0,15)
-minbtn.BackgroundColor3 = Color3.new(0.9, 0.7, 0.1)
-minbtn.BorderSizePixel = 0
-minbtn.Text = "-"
-minbtn.TextColor3 = Color3.new(0,0,0)
-minbtn.TextSize = 16
-minbtn.Font = Enum.Font.GothamBold
-minbtn.Parent = topbar
-
-local minc = Instance.new("UICorner")
-minc.CornerRadius = UDim.new(0,6)
-minc.Parent = minbtn
-
--- close btn  
-local closebtn = Instance.new("TextButton")
-closebtn.Size = UDim2.new(0,30,0,30)
-closebtn.Position = UDim2.new(1,-30,0,15)
-closebtn.BackgroundColor3 = Color3.new(0.9, 0.3, 0.3)
-closebtn.BorderSizePixel = 0
-closebtn.Text = "X"
-closebtn.TextColor3 = Color3.new(1,1,1)
-closebtn.TextSize = 14
-closebtn.Font = Enum.Font.GothamBold
-closebtn.Parent = topbar
-
-local closec = Instance.new("UICorner")
-closec.CornerRadius = UDim.new(0,6)
-closec.Parent = closebtn
-
--- floating open btn with mobile drag
-local openbtn = Instance.new("TextButton")
-openbtn.Size = UDim2.new(0,50,0,50)
-openbtn.Position = UDim2.new(1,-70,1,-70)
-openbtn.BackgroundColor3 = Color3.new(0.25, 0.15, 0.45)
-openbtn.BorderSizePixel = 0
-openbtn.Text = "OPEN"
-openbtn.TextColor3 = Color3.new(1,1,1)
-openbtn.TextSize = 10
-openbtn.Font = Enum.Font.GothamBold
-openbtn.Visible = false
-openbtn.Active = true
-openbtn.Parent = sg
-
--- mobile drag for open button
-local opendragging = false
-local opendragStart = nil
-local openstartPos = nil
-
-openbtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        opendragging = true
-        opendragStart = input.Position
-        openstartPos = openbtn.Position
+local function createESP(object, color, text, showText)
+    if not object or not object.Parent then return end
+    
+    pcall(function()
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "DoorsESP"
+        highlight.Adornee = object
+        highlight.FillColor = color
+        highlight.FillTransparency = 0.5
+        highlight.OutlineColor = Color3.new(1, 1, 1)
+        highlight.OutlineTransparency = 0.2
+        highlight.Parent = object
+        table.insert(espObjects, highlight)
         
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                opendragging = false
-            end
-        end)
-    end
-end)
-
-openbtn.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if opendragging then
-            local delta = input.Position - opendragStart
-            openbtn.Position = UDim2.new(openstartPos.X.Scale, openstartPos.X.Offset + delta.X, openstartPos.Y.Scale, openstartPos.Y.Offset + delta.Y)
+        if showText then
+            local billboardGui = Instance.new("BillboardGui")
+            billboardGui.Name = "DoorsESPLabel"
+            billboardGui.Adornee = object
+            billboardGui.Size = UDim2.new(0, 80, 0, 25)
+            billboardGui.AlwaysOnTop = true
+            billboardGui.Parent = object
+            
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+            textLabel.BackgroundTransparency = 0.3
+            textLabel.BorderSizePixel = 0
+            textLabel.Text = text
+            textLabel.TextColor3 = color
+            textLabel.TextSize = 12
+            textLabel.Font = Enum.Font.SourceSansBold
+            textLabel.Parent = billboardGui
+            
+            table.insert(espObjects, billboardGui)
         end
-    end
-end)
-
-local openc = Instance.new("UICorner")
-openc.CornerRadius = UDim.new(0,25)
-openc.Parent = openbtn
-
--- content area
-local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1,-20,1,-80)
-scroll.Position = UDim2.new(0,10,0,70)
-scroll.BackgroundTransparency = 1
-scroll.BorderSizePixel = 0
-scroll.ScrollBarThickness = 6
-scroll.ScrollBarImageColor3 = Color3.new(0.25, 0.15, 0.45)
-scroll.ScrollingEnabled = true
-scroll.CanvasSize = UDim2.new(0, 0, 0, 420)
-scroll.ScrollingDirection = Enum.ScrollingDirection.Y
-scroll.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
-scroll.Parent = main
-
--- button maker
-local function makebtn(parent, text, pos, color, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1,-10,0, mobile and 40 or 35)
-    btn.Position = UDim2.new(0,5,0,pos)
-    btn.BackgroundColor3 = Color3.new(0.15, 0.15, 0.2)
-    btn.BorderSizePixel = 0
-    btn.Text = ""
-    btn.Parent = parent
-    
-    local bc = Instance.new("UICorner")
-    bc.CornerRadius = UDim.new(0,8)
-    bc.Parent = btn
-    
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1,-50,1,0)
-    lbl.Position = UDim2.new(0,10,0,0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.new(0.9,0.9,0.9)
-    lbl.TextSize = mobile and 11 or 12
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = btn
-    
-    local status = Instance.new("Frame")
-    status.Size = UDim2.new(0,35,0,18)
-    status.Position = UDim2.new(1,-40,0.5,-9)
-    status.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-    status.BorderSizePixel = 0
-    status.Parent = btn
-    
-    local sc = Instance.new("UICorner")
-    sc.CornerRadius = UDim.new(0,9)
-    sc.Parent = status
-    
-    local stxt = Instance.new("TextLabel")
-    stxt.Size = UDim2.new(1,0,1,0)
-    stxt.BackgroundTransparency = 1
-    stxt.Text = "OFF"
-    stxt.TextColor3 = Color3.new(0.6,0.6,0.6)
-    stxt.TextSize = 9
-    stxt.Font = Enum.Font.GothamBold
-    stxt.Parent = status
-    
-    local enabled = false
-    btn.MouseButton1Click:Connect(function()
-        enabled = not enabled
-        stxt.Text = enabled and "ON" or "OFF"
-        
-        local targetcolor = enabled and color or Color3.new(0.3, 0.3, 0.3)
-        local targettxt = enabled and Color3.new(1,1,1) or Color3.new(0.6,0.6,0.6)
-        
-        tweens:Create(status, TweenInfo.new(0.2), {BackgroundColor3 = targetcolor}):Play()
-        tweens:Create(stxt, TweenInfo.new(0.2), {TextColor3 = targettxt}):Play()
-        
-        callback(enabled)
     end)
 end
 
--- button actions
-minbtn.MouseButton1Click:Connect(function()
-    main.Visible = false
-    openbtn.Visible = true
-end)
-
-openbtn.MouseButton1Click:Connect(function()
-    main.Visible = true
-    openbtn.Visible = false
-end)
-
-closebtn.MouseButton1Click:Connect(function()
-    -- cleanup
-    for _, h in pairs(espstuff) do
-        if h and h.Parent then h:Destroy() end
-    end
-    for _, b in pairs(textlabels) do
-        if b and b.Parent then b:Destroy() end
+-- Auto Collection Functions
+local function isCollectible(object)
+    local name = object.Name:lower()
+    local parent = object.Parent
+    
+    -- Check if it's a key
+    if name:find("key") or (parent and parent.Name == "KeyObtain") then
+        return true, "key"
     end
     
-    local char = plr.Character
-    if char then
-        local hum = char:FindFirstChild("Humanoid")
-        if hum then
-            hum.MaxHealth = 100
-            hum.Health = 100
+    -- Check if it's gold/coins
+    if name:find("gold") or name:find("coin") then
+        return true, "gold"
+    end
+    
+    -- Check if it's an item
+    local itemNames = {"book", "vitamin", "flashlight", "lighter", "candle", "crucifix"}
+    for _, itemName in pairs(itemNames) do
+        if name:find(itemName) then
+            return true, "item"
         end
-        
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if root then
-            local bv = root:FindFirstChild("BodyVelocity")
-            if bv then bv:Destroy() end
+    end
+    
+    -- Check if it's a chest/container
+    local chestNames = {"chest", "drawer", "wardrobe", "closet"}
+    for _, chestName in pairs(chestNames) do
+        if name:find(chestName) then
+            return true, "chest"
         end
+    end
+    
+    return false, nil
+end
+
+local function collectItem(object)
+    if not object or not object.Parent then return end
+    
+    -- Check if already collected this item
+    local objectId = tostring(object)
+    if collectedItems[objectId] then return end
+    
+    pcall(function()
+        print("Attempting to collect:", object.Name)
         
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                part.CanCollide = true
+        -- For items like GoldVisualHolder, we need to search the entire parent structure
+        local searchObjects = {object}
+        
+        -- Add parent and grandparent to search list
+        if object.Parent then
+            table.insert(searchObjects, object.Parent)
+            if object.Parent.Parent then
+                table.insert(searchObjects, object.Parent.Parent)
             end
         end
-    end
-    
-    sg:Destroy()
-end)
-
--- esp section
-local espsec = Instance.new("Frame")
-espsec.Size = UDim2.new(1,0,0,250)
-espsec.BackgroundColor3 = Color3.new(0.12, 0.12, 0.18)
-espsec.BorderSizePixel = 0
-espsec.Parent = scroll
-
-local espc = Instance.new("UICorner")
-espc.CornerRadius = UDim.new(0,10)
-espc.Parent = espsec
-
-local esptitle = Instance.new("TextLabel")
-esptitle.Size = UDim2.new(1,0,0,25)
-esptitle.Position = UDim2.new(0,10,0,5)
-esptitle.BackgroundTransparency = 1
-esptitle.Text = "ESP Features"
-esptitle.TextColor3 = Color3.new(0.4, 0.8, 1)
-esptitle.TextSize = mobile and 13 or 14
-esptitle.Font = Enum.Font.GothamBold
-esptitle.TextXAlignment = Enum.TextXAlignment.Left
-esptitle.Parent = espsec
-
--- movement section
-local movesec = Instance.new("Frame")
-movesec.Size = UDim2.new(1,0,0,140)
-movesec.Position = UDim2.new(0,0,0,260)
-movesec.BackgroundColor3 = Color3.new(0.12, 0.12, 0.18)
-movesec.BorderSizePixel = 0
-movesec.Parent = scroll
-
-local movec = Instance.new("UICorner")
-movec.CornerRadius = UDim.new(0,10)
-movec.Parent = movesec
-
-local movetitle = Instance.new("TextLabel")
-movetitle.Size = UDim2.new(1,0,0,25)
-movetitle.Position = UDim2.new(0,10,0,5)
-movetitle.BackgroundTransparency = 1
-movetitle.Text = "Movement & Combat"
-movetitle.TextColor3 = Color3.new(1, 0.6, 0.4)
-movetitle.TextSize = mobile and 13 or 14
-movetitle.Font = Enum.Font.GothamBold
-movetitle.TextXAlignment = Enum.TextXAlignment.Left
-movetitle.Parent = movesec
-
--- create esp buttons
-makebtn(espsec, "Door ESP", 30, Color3.new(0, 0.8, 0.4), function(enabled)
-    dooresp = enabled
-end)
-
-makebtn(espsec, "Key ESP", 75, Color3.new(1, 0.8, 0), function(enabled)
-    keyesp = enabled
-end)
-
-makebtn(espsec, "Gold/Coin ESP", 120, Color3.new(1, 0.7, 0.2), function(enabled)
-    coinesp = enabled
-end)
-
-makebtn(espsec, "Book ESP", 165, Color3.new(0.5, 0.8, 1), function(enabled)
-    bookesp = enabled
-end)
-
-makebtn(espsec, "Lever ESP", 210, Color3.new(0.8, 0.4, 1), function(enabled)
-    leversp = enabled
-end)
-
--- create movement buttons
-makebtn(movesec, "Noclip", 30, Color3.new(0.6, 0.4, 1), function(enabled)
-    noclip = enabled
-end)
-
-makebtn(movesec, "Fly (WASD + Space/Shift)", 75, Color3.new(0.4, 0.8, 1), function(enabled)
-    fly = enabled
-    local char = plr.Character
-    if not char then return end
-    
-    local root = char:FindFirstChild("HumanoidRootPart")
-    
-    if enabled and root then
-        local bv = Instance.new("BodyVelocity")
-        bv.MaxForce = Vector3.new(4000, 4000, 4000)
-        bv.Velocity = Vector3.new(0, 0, 0)
-        bv.Parent = root
-    else
-        if root then
-            local bv = root:FindFirstChild("BodyVelocity")
-            if bv then bv:Destroy() end
+        
+        -- Search each object and all their descendants
+        for _, searchObj in pairs(searchObjects) do
+            -- Check the object itself first
+            local proximityPrompt = searchObj:FindFirstChildOfClass("ProximityPrompt")
+            if proximityPrompt then
+                print("Using ProximityPrompt on", searchObj.Name)
+                fireproximityprompt(proximityPrompt)
+                collectedItems[objectId] = true
+                return
+            end
+            
+            local clickDetector = searchObj:FindFirstChildOfClass("ClickDetector")
+            if clickDetector then
+                print("Using ClickDetector on", searchObj.Name)
+                fireclickdetector(clickDetector)
+                collectedItems[objectId] = true
+                return
+            end
+            
+            -- Search all descendants
+            for _, descendant in pairs(searchObj:GetDescendants()) do
+                if descendant:IsA("ProximityPrompt") then
+                    print("Using ProximityPrompt in", searchObj.Name, "->", descendant.Name)
+                    fireproximityprompt(descendant)
+                    collectedItems[objectId] = true
+                    return
+                elseif descendant:IsA("ClickDetector") then
+                    print("Using ClickDetector in", searchObj.Name, "->", descendant.Name)
+                    fireclickdetector(descendant)
+                    collectedItems[objectId] = true
+                    return
+                end
+            end
         end
-    end
-end)
-
-makebtn(movesec, "Godmode", 120, Color3.new(1, 0.4, 0.4), function(enabled)
-    god = enabled
-end)
-
--- esp functions
-local function clearesp()
-    for _, h in pairs(espstuff) do
-        if h and h.Parent then h:Destroy() end
-    end
-    for _, b in pairs(textlabels) do
-        if b and b.Parent then b:Destroy() end
-    end
-    espstuff = {}
-    textlabels = {}
+        
+        print("No interaction found for:", object.Name, "- Searched", #searchObjects, "objects")
+        collectedItems[objectId] = true -- Mark as attempted
+    end)
 end
 
-local function addesp(obj, color, text, showtext)
-    if not obj or not obj.Parent then return end
+local function updateCollectibleItems()
+    collectibleItems = {}
+    local currentRooms = Workspace:FindFirstChild("CurrentRooms")
+    if not currentRooms then return end
     
-    local highlight = Instance.new("Highlight")
-    highlight.Adornee = obj
-    highlight.FillColor = color
-    highlight.FillTransparency = 0.4
-    highlight.OutlineColor = Color3.new(1, 1, 1)
-    highlight.OutlineTransparency = 0
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Parent = obj
-    table.insert(espstuff, highlight)
-    
-    if showtext then
-        local bill = Instance.new("BillboardGui")
-        bill.Adornee = obj
-        bill.Size = UDim2.new(0, 150, 0, 50)
-        bill.AlwaysOnTop = true
-        bill.Parent = obj
-        
-        local bg = Instance.new("Frame")
-        bg.Size = UDim2.new(0, 100, 0, 30)
-        bg.Position = UDim2.new(0.5, -50, 0.5, -15)
-        bg.BackgroundColor3 = Color3.new(0, 0, 0)
-        bg.BackgroundTransparency = 0.4
-        bg.BorderSizePixel = 0
-        bg.Parent = bill
-        
-        local bgc = Instance.new("UICorner")
-        bgc.CornerRadius = UDim.new(0, 6)
-        bgc.Parent = bg
-        
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, 0, 1, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = text
-        lbl.TextColor3 = color
-        lbl.TextStrokeTransparency = 0
-        lbl.TextStrokeColor3 = Color3.new(0, 0, 0)
-        lbl.TextSize = mobile and 12 or 14
-        lbl.Font = Enum.Font.GothamBold
-        lbl.Parent = bg
-        
-        table.insert(textlabels, bill)
-    end
-end
-
-local function scanesp()
-    if not (dooresp or keyesp or coinesp or bookesp or leversp) then return end
-    
-    clearesp()
-    
-    local rooms = workspace:FindFirstChild("CurrentRooms")
-    if not rooms then return end
-    
-    for _, room in pairs(rooms:GetChildren()) do
+    for _, room in pairs(currentRooms:GetChildren()) do
         if tonumber(room.Name) then
-            -- doors
-            if dooresp then
-                local doorFolder = room:FindFirstChild("Door")
-                if doorFolder then
-                    local door = doorFolder:FindFirstChild("Door")
-                    if door then
-                        addesp(door, Color3.new(0, 1, 0.4), "DOOR", false)
+            -- Scan all descendants in the room
+            for _, descendant in pairs(room:GetDescendants()) do
+                -- Check if it has any interaction elements (ClickDetector or ProximityPrompt)
+                local hasInteraction = descendant:FindFirstChildOfClass("ClickDetector") or 
+                                     descendant:FindFirstChildOfClass("ProximityPrompt") or
+                                     (descendant.Parent and (descendant.Parent:FindFirstChildOfClass("ClickDetector") or descendant.Parent:FindFirstChildOfClass("ProximityPrompt")))
+                
+                if hasInteraction and descendant:IsA("BasePart") then
+                    local canCollect, itemType = isCollectible(descendant)
+                    if canCollect then
+                        table.insert(collectibleItems, {
+                            object = descendant,
+                            type = itemType,
+                            position = descendant.Position
+                        })
                     end
                 end
             end
-            
-            -- keys
-            if keyesp then
-                local assets = room:FindFirstChild("Assets")
-                if assets then
-                    local keyObtain = assets:FindFirstChild("KeyObtain")
-                    if keyObtain then
-                        local hitbox = keyObtain:FindFirstChild("Hitbox")
-                        if hitbox then
-                            local keyHitbox = hitbox:FindFirstChild("KeyHitbox")
-                            if keyHitbox then
-                                addesp(keyHitbox, Color3.new(1, 0.9, 0), "KEY", true)
+        end
+    end
+end
+
+local function autoCollectNearbyItems()
+    if not settings.autoCollect or not character or not humanoidRootPart then return end
+    
+    local currentRooms = Workspace:FindFirstChild("CurrentRooms")
+    if not currentRooms then return end
+    
+    local playerPosition = humanoidRootPart.Position
+    
+    -- Scan for nearby interactable objects in real-time
+    for _, room in pairs(currentRooms:GetChildren()) do
+        if tonumber(room.Name) then
+            for _, descendant in pairs(room:GetDescendants()) do
+                if descendant:IsA("BasePart") and descendant.Parent then
+                    local distance = (playerPosition - descendant.Position).Magnitude
+                    
+                    -- Only check very close objects (6 studs max)
+                    if distance <= 6 then
+                        local objectId = tostring(descendant)
+                        
+                        -- Skip if already processed
+                        if not collectedItems[objectId] then
+                            -- Check if it's a collectible item first
+                            local canCollect, itemType = isCollectible(descendant)
+                            if canCollect then
+                                print("Found collectible:", descendant.Name, "Type:", itemType, "Distance:", math.floor(distance))
+                                collectItem(descendant)
+                                task.wait(0.5) -- Wait between collections
+                                return -- Only try one item per cycle
                             end
                         end
                     end
                 end
             end
-            
-            -- gold/coins
-            if coinesp then
-                local assets = room:FindFirstChild("Assets")
-                if assets then
-                    -- gold piles
-                    for _, obj in pairs(assets:GetChildren()) do
-                        if obj.Name == "GoldPile" then
-                            addesp(obj, Color3.new(1, 0.8, 0.2), "GOLD", true)
-                        end
-                    end
-                end
-            end
-            
-            -- books
-            if bookesp then
-                local assets = room:FindFirstChild("Assets")
-                if assets then
-                    for _, obj in pairs(assets:GetChildren()) do
-                        if obj.Name:find("Book") or obj.Name == "LibraryHintPaper" then
-                            addesp(obj, Color3.new(0.5, 0.8, 1), "BOOK", true)
-                        end
-                    end
-                end
-            end
-            
-            -- levers
-            if leversp then
-                local assets = room:FindFirstChild("Assets")
-                if assets then
-                    for _, obj in pairs(assets:GetChildren()) do
-                        if obj.Name:find("Lever") then
-                            addesp(obj, Color3.new(0.8, 0.4, 1), "LEVER", true)
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- scan workspace for other items
-    if coinesp then
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj.Name == "GoldPile" or obj.Name:find("Coin") then
-                addesp(obj, Color3.new(1, 0.8, 0.2), "GOLD", true)
-            end
-        end
-    end
-    
-    if bookesp then
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj.Name:find("Book") or obj.Name == "LibraryHintPaper" or obj.Name:find("Paper") then
-                addesp(obj, Color3.new(0.5, 0.8, 1), "BOOK", true)
-            end
         end
     end
 end
 
--- set scroll size (bigger canvas for proper scrolling)
-scroll.CanvasSize = UDim2.new(0, 0, 0, 450)
-
--- main loop
-local lastesp = 0
-rs.Heartbeat:Connect(function()
-    local now = tick()
+-- Enhanced room scanning
+local function scanRoom(room)
+    if not room or not tonumber(room.Name) then return end
     
-    if now - lastesp > 0.5 then
-        scanesp()
-        lastesp = now
-    end
-    
-    local char = plr.Character
-    if not char then return end
-    
-    if noclip then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide and part.Name ~= "HumanoidRootPart" then
-                part.CanCollide = false
+    pcall(function()
+        -- Door ESP
+        if settings.doorESP then
+            local door = room:FindFirstChild("Door")
+            if door then
+                for _, part in pairs(door:GetDescendants()) do
+                    if part.Name == "Door" and part:IsA("BasePart") then
+                        createESP(part, Color3.new(0, 1, 0.4), "DOOR", false)
+                        break
+                    end
+                end
             end
         end
-    end
-    
-    if fly then
-        local root = char:FindFirstChild("HumanoidRootPart")
-        local bv = root and root:FindFirstChild("BodyVelocity")
         
-        if bv then
-            local move = Vector3.new(0, 0, 0)
-            local flyspeed = 50
-            
-            if uis:IsKeyDown(Enum.KeyCode.W) then
-                move = move + (workspace.Camera.CoordinateFrame.LookVector * flyspeed)
+        -- Key ESP
+        if settings.keyESP then
+            for _, descendant in pairs(room:GetDescendants()) do
+                if descendant.Name == "KeyObtain" then
+                    local key = descendant:FindFirstChild("Key")
+                    if key and key:IsA("BasePart") then
+                        createESP(key, Color3.new(1, 0.84, 0), "KEY", true)
+                    end
+                elseif descendant.Name == "Key" and descendant:IsA("BasePart") and descendant.Size.Magnitude < 5 then
+                    createESP(descendant, Color3.new(1, 0.84, 0), "KEY", true)
+                end
             end
-            if uis:IsKeyDown(Enum.KeyCode.S) then
-                move = move - (workspace.Camera.CoordinateFrame.LookVector * flyspeed)
+        end
+        
+        -- Gold ESP
+        if settings.goldESP then
+            for _, descendant in pairs(room:GetDescendants()) do
+                if (descendant.Name:find("Gold") or descendant.Name:find("Coin")) and descendant:IsA("BasePart") then
+                    createESP(descendant, Color3.new(1, 0.65, 0), "GOLD", true)
+                end
             end
-            if uis:IsKeyDown(Enum.KeyCode.A) then
-                move = move - (workspace.Camera.CoordinateFrame.RightVector * flyspeed)
+        end
+        
+        -- Item ESP
+        if settings.itemESP then
+            local itemNames = {"Book", "Vitamin", "Flashlight", "Lighter", "Candle", "Crucifix"}
+            for _, descendant in pairs(room:GetDescendants()) do
+                for _, itemName in pairs(itemNames) do
+                    if descendant.Name:find(itemName) and descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(0.4, 0.6, 1), itemName:upper(), true)
+                        break
+                    end
+                end
             end
-            if uis:IsKeyDown(Enum.KeyCode.D) then
-                move = move + (workspace.Camera.CoordinateFrame.RightVector * flyspeed)
+        end
+        
+        -- Lever ESP
+        if settings.leverESP then
+            for _, descendant in pairs(room:GetDescendants()) do
+                if descendant.Name:find("Lever") and descendant:IsA("BasePart") then
+                    createESP(descendant, Color3.new(0.8, 0.4, 1), "LEVER", true)
+                end
             end
-            if uis:IsKeyDown(Enum.KeyCode.Space) then
-                move = move + Vector3.new(0, flyspeed, 0)
+        end
+        
+        -- Chest ESP
+        if settings.chestESP then
+            local chestNames = {"Chest", "Drawer", "Wardrobe", "Closet"}
+            for _, descendant in pairs(room:GetDescendants()) do
+                for _, chestName in pairs(chestNames) do
+                    if descendant.Name:find(chestName) then
+                        createESP(descendant, Color3.new(1, 0.4, 0.8), "CHEST", true)
+                        break
+                    end
+                end
             end
-            if uis:IsKeyDown(Enum.KeyCode.LeftShift) then
-                move = move - Vector3.new(0, flyspeed, 0)
+        end
+    end)
+end
+
+-- Safe teleportation function
+local function teleportToSafety()
+    if not character or not humanoidRootPart then return end
+    
+    local currentRooms = Workspace:FindFirstChild("CurrentRooms")
+    if not currentRooms then return end
+    
+    -- Find a room with hiding spots
+    for _, room in pairs(currentRooms:GetChildren()) do
+        if tonumber(room.Name) then
+            for _, descendant in pairs(room:GetDescendants()) do
+                if descendant.Name:find("Wardrobe") or descendant.Name:find("Closet") or descendant.Name:find("Bed") then
+                    local safePos = descendant.Position + Vector3.new(0, 5, 0)
+                    humanoidRootPart.CFrame = CFrame.new(safePos)
+                    return true
+                end
             end
-            
-            bv.Velocity = move
         end
     end
     
-    if god then
-        local hum = char:FindFirstChild("Humanoid")
-        if hum and hum.Health then
-            hum.Health = hum.MaxHealth
+    -- Fallback: teleport up
+    humanoidRootPart.CFrame = humanoidRootPart.CFrame + Vector3.new(0, 15, 0)
+    return false
+end
+
+-- Notification system (only for entity notifications)
+local function createNotification(text, color)
+    if not settings.entityNotifications then return end
+    
+    local notification = Instance.new("Frame")
+    notification.Size = UDim2.new(0, 200, 0, 40)
+    notification.Position = UDim2.new(1, -210, 0, #screenGui:GetChildren() * 45 + 10)
+    notification.BackgroundColor3 = color or Color3.new(1, 0.4, 0.4)
+    notification.BorderSizePixel = 0
+    notification.Parent = screenGui
+    
+    local notifText = Instance.new("TextLabel")
+    notifText.Size = UDim2.new(1, -5, 1, 0)
+    notifText.Position = UDim2.new(0, 5, 0, 0)
+    notifText.BackgroundTransparency = 1
+    notifText.Text = text
+    notifText.TextColor3 = Color3.new(1, 1, 1)
+    notifText.TextSize = 11
+    notifText.Font = Enum.Font.SourceSansBold
+    notifText.TextWrapped = true
+    notifText.Parent = notification
+    
+    task.spawn(function()
+        task.wait(3)
+        pcall(function() notification:Destroy() end)
+    end)
+end
+
+-- Entity detection
+local function setupEntityProtection()
+    connections.entityDetection = Workspace.ChildAdded:Connect(function(child)
+        local name = child.Name:lower()
+        
+        if name:find("rush") then
+            createNotification("RUSH DETECTED!", Color3.new(1, 0, 0))
+            if settings.antiRush then
+                teleportToSafety()
+            end
+        elseif name:find("ambush") then
+            createNotification("AMBUSH DETECTED!", Color3.new(1, 0.4, 0))
+            if settings.antiAmbush then
+                teleportToSafety()
+            end
+        elseif name:find("seek") then
+            createNotification("SEEK DETECTED!", Color3.new(0.6, 0, 0.6))
+            if settings.antiSeek and humanoidRootPart then
+                humanoidRootPart.CFrame = humanoidRootPart.CFrame + humanoidRootPart.CFrame.LookVector * 30
+            end
+        elseif name:find("screech") then
+            createNotification("SCREECH DETECTED!", Color3.new(1, 1, 0))
+            if settings.antiScreech then
+                task.spawn(function()
+                    task.wait(0.1)
+                    local gui = player.PlayerGui:FindFirstChild("MainUI")
+                    if gui and gui:FindFirstChild("Screech") then
+                        local screech = gui.Screech:FindFirstChild("ImageButton")
+                        if screech then
+                            fireclick(screech)
+                        end
+                    end
+                end)
+            end
+        elseif name:find("eyes") then
+            createNotification("EYES DETECTED!", Color3.new(1, 0, 1))
+            if settings.antiEyes and humanoidRootPart then
+                humanoidRootPart.CFrame = CFrame.new(humanoidRootPart.Position, humanoidRootPart.Position - humanoidRootPart.CFrame.LookVector)
+            end
+        elseif name:find("halt") then
+            createNotification("HALT DETECTED!", Color3.new(0, 1, 1))
+            if settings.antiHalt and character and character:FindFirstChild("Humanoid") then
+                local originalSpeed = character.Humanoid.WalkSpeed
+                character.Humanoid.WalkSpeed = 0
+                task.wait(2)
+                character.Humanoid.WalkSpeed = originalSpeed
+            end
         end
+    end)
+end
+
+-- Fullbright function
+local function toggleFullbright(enabled)
+    if enabled then
+        originalLighting.Ambient = Lighting.Ambient
+        originalLighting.Brightness = Lighting.Brightness
+        originalLighting.ClockTime = Lighting.ClockTime
+        
+        Lighting.Ambient = Color3.new(1, 1, 1)
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 12
+    else
+        if originalLighting.Ambient then
+            Lighting.Ambient = originalLighting.Ambient
+            Lighting.Brightness = originalLighting.Brightness
+            Lighting.ClockTime = originalLighting.ClockTime
+        end
+    end
+end
+
+-- Main ESP and collection loop
+local function startMainLoop()
+    connections.mainLoop = RunService.Heartbeat:Connect(function()
+        if tick() % 2 < 0.016 then -- Update every 2 seconds
+            clearESP()
+            local currentRooms = Workspace:FindFirstChild("CurrentRooms")
+            if currentRooms then
+                for _, room in pairs(currentRooms:GetChildren()) do
+                    scanRoom(room)
+                end
+            end
+        end
+        
+        -- Auto collect items (runs every 1 second for mobile)
+        if tick() % 1 < 0.016 then
+            autoCollectNearbyItems()
+        end
+    end)
+end
+
+-- GUI Controls
+local function toggleGUI()
+    isMinimized = not isMinimized
+    contentFrame.Visible = not isMinimized
+    
+    if isMinimized then
+        mainFrame.Size = UDim2.new(0, 320, 0, 30)
+        minimizeBtn.Text = "+"
+    else
+        mainFrame.Size = UDim2.new(0, 320, 0, 420)
+        minimizeBtn.Text = "-"
+    end
+end
+
+-- Connect GUI events
+minimizeBtn.MouseButton1Click:Connect(toggleGUI)
+
+closeBtn.MouseButton1Click:Connect(function()
+    clearESP()
+    for _, connection in pairs(connections) do
+        if connection then connection:Disconnect() end
+    end
+    if settings.fullbright then
+        toggleFullbright(false)
+    end
+    screenGui:Destroy()
+end)
+
+-- Settings change handler
+task.spawn(function()
+    while screenGui.Parent do
+        if settings.fullbright then
+            toggleFullbright(true)
+        else
+            toggleFullbright(false)
+        end
+        task.wait(0.5)
     end
 end)
 
-print("doors hack loaded - mobile drag + more esp items")
+-- Initialize everything
+print("Initializing systems...")
+setupEntityProtection()
+startMainLoop()
+
+print("Doors Hack v2.1 with Auto Collection successfully loaded!")
+print("UI should now be visible. Check your screen for the GUI window.")
+print("Auto Collection: Toggle 'Auto Collect All Items' to automatically pick up keys, gold, and items!")
