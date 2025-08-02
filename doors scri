@@ -1,21 +1,14 @@
--- doors hack v3 - working version
-print("=== DOORS HACK STARTING ===")
-
+-- doors hack v3 - mobile drag + more esp
 local plr = game.Players.LocalPlayer
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local coregui = game:GetService("CoreGui")
 local tweens = game:GetService("TweenService")
 
-print("✓ Services loaded")
-
 -- cleanup old stuff
-pcall(function()
-    if coregui:FindFirstChild("doorshack") then
-        coregui.doorshack:Destroy()
-        print("✓ Cleaned up old GUI")
-    end
-end)
+if coregui:FindFirstChild("doorshack") then
+    coregui.doorshack:Destroy()
+end
 
 -- vars
 local espstuff = {}
@@ -25,211 +18,293 @@ local keyesp = false
 local coinesp = false
 local bookesp = false
 local leversp = false
+local chestesp = false
+local entityesp = false
 local noclip = false
+local fly = false
 local god = false
 
 -- main gui
 local sg = Instance.new("ScreenGui")
 sg.Name = "doorshack"
 sg.ResetOnSpawn = false
-
--- Try CoreGui first, then PlayerGui
-local parentSuccess = false
-pcall(function()
-    sg.Parent = coregui
-    parentSuccess = true
-    print("✓ GUI parented to CoreGui")
-end)
-
-if not parentSuccess then
-    sg.Parent = plr.PlayerGui
-    print("✓ GUI parented to PlayerGui")
-end
+sg.Parent = coregui
 
 -- check if mobile
 local mobile = uis.TouchEnabled and not uis.KeyboardEnabled
 
 -- main frame
 local main = Instance.new("Frame")
-main.Name = "MainFrame"
-main.Size = mobile and UDim2.new(0,300,0,400) or UDim2.new(0,350,0,450)
-main.Position = UDim2.new(0.5, mobile and -150 or -175, 0.5, mobile and -200 or -225)
-main.BackgroundColor3 = Color3.new(0.1, 0.1, 0.15)
-main.BorderSizePixel = 1
-main.BorderColor3 = Color3.new(0.3, 0.3, 0.4)
+main.Size = mobile and UDim2.new(0,320,0,520) or UDim2.new(0,360,0,480)
+main.Position = UDim2.new(0.5, mobile and -160 or -180, 0.5, mobile and -260 or -240)
+main.BackgroundColor3 = Color3.new(0.08, 0.08, 0.12)
+main.BorderSizePixel = 0
 main.Active = true
-main.Draggable = true
 main.Parent = sg
 
-print("✓ Main frame created")
+-- mobile drag support
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+local function updateInput(input)
+    local delta = input.Position - dragStart
+    main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+main.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if dragging then
+            updateInput(input)
+        end
+    end
+end)
 
 -- rounded corners
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0,8)
+corner.CornerRadius = UDim.new(0,12)
 corner.Parent = main
 
--- header
-local header = Instance.new("Frame")
-header.Size = UDim2.new(1,0,0,50)
-header.BackgroundColor3 = Color3.new(0.2, 0.1, 0.3)
-header.BorderSizePixel = 0
-header.Parent = main
+-- header bar
+local topbar = Instance.new("Frame")
+topbar.Size = UDim2.new(1,0,0,60)
+topbar.BackgroundColor3 = Color3.new(0.25, 0.15, 0.45)
+topbar.BorderSizePixel = 0
+topbar.Parent = main
 
-local headercorner = Instance.new("UICorner")
-headercorner.CornerRadius = UDim.new(0,8)
-headercorner.Parent = header
+local topcorner = Instance.new("UICorner")
+topcorner.CornerRadius = UDim.new(0,12)
+topcorner.Parent = topbar
 
--- fix header bottom
-local headerfix = Instance.new("Frame")
-headerfix.Size = UDim2.new(1,0,0,8)
-headerfix.Position = UDim2.new(0,0,1,-8)
-headerfix.BackgroundColor3 = Color3.new(0.2, 0.1, 0.3)
-headerfix.BorderSizePixel = 0
-headerfix.Parent = header
+-- fix bottom of header
+local fix = Instance.new("Frame")
+fix.Size = UDim2.new(1,0,0,12)
+fix.Position = UDim2.new(0,0,1,-12)
+fix.BackgroundColor3 = Color3.new(0.25, 0.15, 0.45)
+fix.BorderSizePixel = 0
+fix.Parent = topbar
 
--- title
+-- title stuff
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,-60,1,0)
-title.Position = UDim2.new(0,10,0,0)
+title.Size = UDim2.new(1,-80,0,25)
+title.Position = UDim2.new(0,15,0,10)
 title.BackgroundTransparency = 1
-title.Text = "DOORS HACK"
+title.Text = "doors hack"
 title.TextColor3 = Color3.new(1,1,1)
-title.TextSize = 18
-title.Font = Enum.Font.SourceSansBold
+title.TextSize = mobile and 16 or 18
+title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = header
+title.Parent = topbar
 
--- close button
+local subtitle = Instance.new("TextLabel")
+subtitle.Size = UDim2.new(1,-80,0,20)
+subtitle.Position = UDim2.new(0,15,0,30)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "mobile drag support"
+subtitle.TextColor3 = Color3.new(0.7,0.7,0.9)
+subtitle.TextSize = mobile and 11 or 12
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
+subtitle.Parent = topbar
+
+-- minimize btn
+local minbtn = Instance.new("TextButton")
+minbtn.Size = UDim2.new(0,30,0,30)
+minbtn.Position = UDim2.new(1,-65,0,15)
+minbtn.BackgroundColor3 = Color3.new(0.9, 0.7, 0.1)
+minbtn.BorderSizePixel = 0
+minbtn.Text = "-"
+minbtn.TextColor3 = Color3.new(0,0,0)
+minbtn.TextSize = 16
+minbtn.Font = Enum.Font.GothamBold
+minbtn.Parent = topbar
+
+local minc = Instance.new("UICorner")
+minc.CornerRadius = UDim.new(0,6)
+minc.Parent = minbtn
+
+-- close btn  
 local closebtn = Instance.new("TextButton")
 closebtn.Size = UDim2.new(0,30,0,30)
-closebtn.Position = UDim2.new(1,-40,0,10)
-closebtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
+closebtn.Position = UDim2.new(1,-30,0,15)
+closebtn.BackgroundColor3 = Color3.new(0.9, 0.3, 0.3)
 closebtn.BorderSizePixel = 0
 closebtn.Text = "X"
 closebtn.TextColor3 = Color3.new(1,1,1)
-closebtn.TextSize = 16
-closebtn.Font = Enum.Font.SourceSansBold
-closebtn.Parent = header
+closebtn.TextSize = 14
+closebtn.Font = Enum.Font.GothamBold
+closebtn.Parent = topbar
 
-local closecorner = Instance.new("UICorner")
-closecorner.CornerRadius = UDim.new(0,4)
-closecorner.Parent = closebtn
+local closec = Instance.new("UICorner")
+closec.CornerRadius = UDim.new(0,6)
+closec.Parent = closebtn
 
--- content frame
-local content = Instance.new("Frame")
-content.Size = UDim2.new(1,-20,1,-70)
-content.Position = UDim2.new(0,10,0,60)
-content.BackgroundTransparency = 1
-content.Parent = main
+-- floating open btn with mobile drag
+local openbtn = Instance.new("TextButton")
+openbtn.Size = UDim2.new(0,50,0,50)
+openbtn.Position = UDim2.new(1,-70,1,-70)
+openbtn.BackgroundColor3 = Color3.new(0.25, 0.15, 0.45)
+openbtn.BorderSizePixel = 0
+openbtn.Text = "OPEN"
+openbtn.TextColor3 = Color3.new(1,1,1)
+openbtn.TextSize = 10
+openbtn.Font = Enum.Font.GothamBold
+openbtn.Visible = false
+openbtn.Active = true
+openbtn.Parent = sg
 
-print("✓ GUI structure created")
+-- mobile drag for open button
+local opendragging = false
+local opendragStart = nil
+local openstartPos = nil
 
--- simple button maker
-local function makeButton(parent, text, ypos, color, callback)
+openbtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        opendragging = true
+        opendragStart = input.Position
+        openstartPos = openbtn.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                opendragging = false
+            end
+        end)
+    end
+end)
+
+openbtn.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if opendragging then
+            local delta = input.Position - opendragStart
+            openbtn.Position = UDim2.new(openstartPos.X.Scale, openstartPos.X.Offset + delta.X, openstartPos.Y.Scale, openstartPos.Y.Offset + delta.Y)
+        end
+    end
+end)
+
+local openc = Instance.new("UICorner")
+openc.CornerRadius = UDim.new(0,25)
+openc.Parent = openbtn
+
+-- content area
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1,-20,1,-80)
+scroll.Position = UDim2.new(0,10,0,70)
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 6
+scroll.ScrollBarImageColor3 = Color3.new(0.25, 0.15, 0.45)
+scroll.ScrollingEnabled = true
+scroll.CanvasSize = UDim2.new(0, 0, 0, 420)
+scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+scroll.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
+scroll.Parent = main
+
+-- button maker
+local function makebtn(parent, text, pos, color, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1,0,0,35)
-    btn.Position = UDim2.new(0,0,0,ypos)
+    btn.Size = UDim2.new(1,-10,0, mobile and 40 or 35)
+    btn.Position = UDim2.new(0,5,0,pos)
     btn.BackgroundColor3 = Color3.new(0.15, 0.15, 0.2)
-    btn.BorderSizePixel = 1
-    btn.BorderColor3 = Color3.new(0.3, 0.3, 0.4)
-    btn.Text = text .. ": OFF"
-    btn.TextColor3 = Color3.new(0.8,0.8,0.8)
-    btn.TextSize = 14
-    btn.Font = Enum.Font.SourceSans
+    btn.BorderSizePixel = 0
+    btn.Text = ""
     btn.Parent = parent
     
-    local btncorner = Instance.new("UICorner")
-    btncorner.CornerRadius = UDim.new(0,4)
-    btncorner.Parent = btn
+    local bc = Instance.new("UICorner")
+    bc.CornerRadius = UDim.new(0,8)
+    bc.Parent = btn
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1,-50,1,0)
+    lbl.Position = UDim2.new(0,10,0,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.new(0.9,0.9,0.9)
+    lbl.TextSize = mobile and 11 or 12
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = btn
+    
+    local status = Instance.new("Frame")
+    status.Size = UDim2.new(0,35,0,18)
+    status.Position = UDim2.new(1,-40,0.5,-9)
+    status.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    status.BorderSizePixel = 0
+    status.Parent = btn
+    
+    local sc = Instance.new("UICorner")
+    sc.CornerRadius = UDim.new(0,9)
+    sc.Parent = status
+    
+    local stxt = Instance.new("TextLabel")
+    stxt.Size = UDim2.new(1,0,1,0)
+    stxt.BackgroundTransparency = 1
+    stxt.Text = "OFF"
+    stxt.TextColor3 = Color3.new(0.6,0.6,0.6)
+    stxt.TextSize = 9
+    stxt.Font = Enum.Font.GothamBold
+    stxt.Parent = status
     
     local enabled = false
     btn.MouseButton1Click:Connect(function()
         enabled = not enabled
-        if enabled then
-            btn.Text = text .. ": ON"
-            btn.BackgroundColor3 = color
-            btn.TextColor3 = Color3.new(1,1,1)
-        else
-            btn.Text = text .. ": OFF"
-            btn.BackgroundColor3 = Color3.new(0.15, 0.15, 0.2)
-            btn.TextColor3 = Color3.new(0.8,0.8,0.8)
-        end
+        stxt.Text = enabled and "ON" or "OFF"
+        
+        local targetcolor = enabled and color or Color3.new(0.3, 0.3, 0.3)
+        local targettxt = enabled and Color3.new(1,1,1) or Color3.new(0.6,0.6,0.6)
+        
+        tweens:Create(status, TweenInfo.new(0.2), {BackgroundColor3 = targetcolor}):Play()
+        tweens:Create(stxt, TweenInfo.new(0.2), {TextColor3 = targettxt}):Play()
+        
         callback(enabled)
-        print(text, "toggled:", enabled)
     end)
-    
-    return btn
 end
 
--- create buttons
-local espLabel = Instance.new("TextLabel")
-espLabel.Size = UDim2.new(1,0,0,25)
-espLabel.BackgroundTransparency = 1
-espLabel.Text = "ESP Features:"
-espLabel.TextColor3 = Color3.new(0.4, 0.8, 1)
-espLabel.TextSize = 16
-espLabel.Font = Enum.Font.SourceSansBold
-espLabel.TextXAlignment = Enum.TextXAlignment.Left
-espLabel.Parent = content
-
-makeButton(content, "Door ESP", 30, Color3.new(0, 0.8, 0.4), function(enabled)
-    dooresp = enabled
+-- button actions
+minbtn.MouseButton1Click:Connect(function()
+    main.Visible = false
+    openbtn.Visible = true
 end)
 
-makeButton(content, "Key ESP", 70, Color3.new(1, 0.8, 0), function(enabled)
-    keyesp = enabled
+openbtn.MouseButton1Click:Connect(function()
+    main.Visible = true
+    openbtn.Visible = false
 end)
 
-makeButton(content, "Gold ESP", 110, Color3.new(1, 0.7, 0.2), function(enabled)
-    coinesp = enabled
-end)
-
-makeButton(content, "Book ESP", 150, Color3.new(0.5, 0.8, 1), function(enabled)
-    bookesp = enabled
-end)
-
-makeButton(content, "Lever ESP", 190, Color3.new(0.8, 0.4, 1), function(enabled)
-    leversp = enabled
-end)
-
-local hackLabel = Instance.new("TextLabel")
-hackLabel.Size = UDim2.new(1,0,0,25)
-hackLabel.Position = UDim2.new(0,0,0,230)
-hackLabel.BackgroundTransparency = 1
-hackLabel.Text = "Hacks:"
-hackLabel.TextColor3 = Color3.new(1, 0.6, 0.4)
-hackLabel.TextSize = 16
-hackLabel.Font = Enum.Font.SourceSansBold
-hackLabel.TextXAlignment = Enum.TextXAlignment.Left
-hackLabel.Parent = content
-
-makeButton(content, "Noclip", 260, Color3.new(0.6, 0.4, 1), function(enabled)
-    noclip = enabled
-end)
-
-makeButton(content, "Godmode", 300, Color3.new(1, 0.4, 0.4), function(enabled)
-    god = enabled
-end)
-
-print("✓ Buttons created")
-
--- close button function
 closebtn.MouseButton1Click:Connect(function()
     -- cleanup
     for _, h in pairs(espstuff) do
-        pcall(function() h:Destroy() end)
+        if h and h.Parent then h:Destroy() end
     end
     for _, b in pairs(textlabels) do
-        pcall(function() b:Destroy() end)
+        if b and b.Parent then b:Destroy() end
     end
     
-    -- reset character
     local char = plr.Character
     if char then
         local hum = char:FindFirstChild("Humanoid")
         if hum then
             hum.MaxHealth = 100
             hum.Health = 100
+        end
+        
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if root then
+            local bv = root:FindFirstChild("BodyVelocity")
+            if bv then bv:Destroy() end
         end
         
         for _, part in pairs(char:GetDescendants()) do
@@ -240,177 +315,273 @@ closebtn.MouseButton1Click:Connect(function()
     end
     
     sg:Destroy()
-    print("✓ GUI closed and cleaned up")
+end)
+
+-- esp section
+local espsec = Instance.new("Frame")
+espsec.Size = UDim2.new(1,0,0,250)
+espsec.BackgroundColor3 = Color3.new(0.12, 0.12, 0.18)
+espsec.BorderSizePixel = 0
+espsec.Parent = scroll
+
+local espc = Instance.new("UICorner")
+espc.CornerRadius = UDim.new(0,10)
+espc.Parent = espsec
+
+local esptitle = Instance.new("TextLabel")
+esptitle.Size = UDim2.new(1,0,0,25)
+esptitle.Position = UDim2.new(0,10,0,5)
+esptitle.BackgroundTransparency = 1
+esptitle.Text = "ESP Features"
+esptitle.TextColor3 = Color3.new(0.4, 0.8, 1)
+esptitle.TextSize = mobile and 13 or 14
+esptitle.Font = Enum.Font.GothamBold
+esptitle.TextXAlignment = Enum.TextXAlignment.Left
+esptitle.Parent = espsec
+
+-- movement section
+local movesec = Instance.new("Frame")
+movesec.Size = UDim2.new(1,0,0,140)
+movesec.Position = UDim2.new(0,0,0,260)
+movesec.BackgroundColor3 = Color3.new(0.12, 0.12, 0.18)
+movesec.BorderSizePixel = 0
+movesec.Parent = scroll
+
+local movec = Instance.new("UICorner")
+movec.CornerRadius = UDim.new(0,10)
+movec.Parent = movesec
+
+local movetitle = Instance.new("TextLabel")
+movetitle.Size = UDim2.new(1,0,0,25)
+movetitle.Position = UDim2.new(0,10,0,5)
+movetitle.BackgroundTransparency = 1
+movetitle.Text = "Movement & Combat"
+movetitle.TextColor3 = Color3.new(1, 0.6, 0.4)
+movetitle.TextSize = mobile and 13 or 14
+movetitle.Font = Enum.Font.GothamBold
+movetitle.TextXAlignment = Enum.TextXAlignment.Left
+movetitle.Parent = movesec
+
+-- create esp buttons
+makebtn(espsec, "Door ESP", 30, Color3.new(0, 0.8, 0.4), function(enabled)
+    dooresp = enabled
+end)
+
+makebtn(espsec, "Key ESP", 75, Color3.new(1, 0.8, 0), function(enabled)
+    keyesp = enabled
+end)
+
+makebtn(espsec, "Gold/Coin ESP", 120, Color3.new(1, 0.7, 0.2), function(enabled)
+    coinesp = enabled
+end)
+
+makebtn(espsec, "Book ESP", 165, Color3.new(0.5, 0.8, 1), function(enabled)
+    bookesp = enabled
+end)
+
+makebtn(espsec, "Lever ESP", 210, Color3.new(0.8, 0.4, 1), function(enabled)
+    leversp = enabled
+end)
+
+-- create movement buttons
+makebtn(movesec, "Noclip", 30, Color3.new(0.6, 0.4, 1), function(enabled)
+    noclip = enabled
+end)
+
+makebtn(movesec, "Fly (WASD + Space/Shift)", 75, Color3.new(0.4, 0.8, 1), function(enabled)
+    fly = enabled
+    local char = plr.Character
+    if not char then return end
+    
+    local root = char:FindFirstChild("HumanoidRootPart")
+    
+    if enabled and root then
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(4000, 4000, 4000)
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.Parent = root
+    else
+        if root then
+            local bv = root:FindFirstChild("BodyVelocity")
+            if bv then bv:Destroy() end
+        end
+    end
+end)
+
+makebtn(movesec, "Godmode", 120, Color3.new(1, 0.4, 0.4), function(enabled)
+    god = enabled
 end)
 
 -- esp functions
-local function clearESP()
+local function clearesp()
     for _, h in pairs(espstuff) do
-        pcall(function() h:Destroy() end)
+        if h and h.Parent then h:Destroy() end
     end
     for _, b in pairs(textlabels) do
-        pcall(function() b:Destroy() end)
+        if b and b.Parent then b:Destroy() end
     end
     espstuff = {}
     textlabels = {}
 end
 
-local function addESP(obj, color, text, showText)
+local function addesp(obj, color, text, showtext)
     if not obj or not obj.Parent then return end
     
-    -- Add highlight
     local highlight = Instance.new("Highlight")
     highlight.Adornee = obj
     highlight.FillColor = color
-    highlight.FillTransparency = 0.5
+    highlight.FillTransparency = 0.4
     highlight.OutlineColor = Color3.new(1, 1, 1)
     highlight.OutlineTransparency = 0
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Parent = obj
     table.insert(espstuff, highlight)
     
-    -- Add text if requested
-    if showText then
+    if showtext then
         local bill = Instance.new("BillboardGui")
         bill.Adornee = obj
-        bill.Size = UDim2.new(0, 100, 0, 40)
+        bill.Size = UDim2.new(0, 150, 0, 50)
         bill.AlwaysOnTop = true
         bill.Parent = obj
         
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundColor3 = Color3.new(0, 0, 0)
-        label.BackgroundTransparency = 0.3
-        label.BorderSizePixel = 0
-        label.Text = text
-        label.TextColor3 = color
-        label.TextStrokeTransparency = 0
-        label.TextStrokeColor3 = Color3.new(0, 0, 0)
-        label.TextSize = 14
-        label.Font = Enum.Font.SourceSansBold
-        label.Parent = bill
+        local bg = Instance.new("Frame")
+        bg.Size = UDim2.new(0, 100, 0, 30)
+        bg.Position = UDim2.new(0.5, -50, 0.5, -15)
+        bg.BackgroundColor3 = Color3.new(0, 0, 0)
+        bg.BackgroundTransparency = 0.4
+        bg.BorderSizePixel = 0
+        bg.Parent = bill
         
-        local labelcorner = Instance.new("UICorner")
-        labelcorner.CornerRadius = UDim.new(0, 4)
-        labelcorner.Parent = label
+        local bgc = Instance.new("UICorner")
+        bgc.CornerRadius = UDim.new(0, 6)
+        bgc.Parent = bg
+        
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = text
+        lbl.TextColor3 = color
+        lbl.TextStrokeTransparency = 0
+        lbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+        lbl.TextSize = mobile and 12 or 14
+        lbl.Font = Enum.Font.GothamBold
+        lbl.Parent = bg
         
         table.insert(textlabels, bill)
     end
 end
 
--- door detection (simplified)
-local function isDoorLocked(door, doorFolder)
-    -- Check common lock indicators
-    if door:GetAttribute("Locked") or doorFolder:GetAttribute("Locked") then
-        return true
-    end
-    
-    -- Check for lock objects
-    if doorFolder:FindFirstChild("Lock") or door:FindFirstChild("Lock") then
-        return true
-    end
-    
-    -- Default to unlocked if we can't determine
-    return false
-end
-
--- esp scanning
-local function scanForESP()
+local function scanesp()
     if not (dooresp or keyesp or coinesp or bookesp or leversp) then return end
     
-    clearESP()
+    clearesp()
     
     local rooms = workspace:FindFirstChild("CurrentRooms")
-    if not rooms then 
-        print("No CurrentRooms found")
-        return 
-    end
+    if not rooms then return end
     
     for _, room in pairs(rooms:GetChildren()) do
         if tonumber(room.Name) then
-            
-            -- Door ESP
+            -- doors
             if dooresp then
                 local doorFolder = room:FindFirstChild("Door")
                 if doorFolder then
                     local door = doorFolder:FindFirstChild("Door")
                     if door then
-                        local locked = isDoorLocked(door, doorFolder)
-                        if locked then
-                            addESP(door, Color3.new(1, 0.3, 0.3), "LOCKED", true)
-                        else
-                            addESP(door, Color3.new(0, 1, 0.4), "DOOR", false)
-                        end
+                        addesp(door, Color3.new(0, 1, 0.4), "DOOR", false)
                     end
                 end
             end
             
-            -- Key ESP
+            -- keys
             if keyesp then
                 local assets = room:FindFirstChild("Assets")
                 if assets then
-                    for _, obj in pairs(assets:GetDescendants()) do
-                        if obj.Name:lower():find("key") and obj:IsA("BasePart") then
-                            addESP(obj, Color3.new(1, 0.9, 0), "KEY", true)
+                    local keyObtain = assets:FindFirstChild("KeyObtain")
+                    if keyObtain then
+                        local hitbox = keyObtain:FindFirstChild("Hitbox")
+                        if hitbox then
+                            local keyHitbox = hitbox:FindFirstChild("KeyHitbox")
+                            if keyHitbox then
+                                addesp(keyHitbox, Color3.new(1, 0.9, 0), "KEY", true)
+                            end
                         end
                     end
                 end
             end
             
-            -- Gold ESP
+            -- gold/coins
             if coinesp then
                 local assets = room:FindFirstChild("Assets")
                 if assets then
+                    -- gold piles
                     for _, obj in pairs(assets:GetChildren()) do
-                        if obj.Name:lower():find("gold") or obj.Name:lower():find("coin") then
-                            addESP(obj, Color3.new(1, 0.8, 0.2), "GOLD", true)
+                        if obj.Name == "GoldPile" then
+                            addesp(obj, Color3.new(1, 0.8, 0.2), "GOLD", true)
                         end
                     end
                 end
             end
             
-            -- Book ESP
+            -- books
             if bookesp then
                 local assets = room:FindFirstChild("Assets")
                 if assets then
                     for _, obj in pairs(assets:GetChildren()) do
-                        if obj.Name:lower():find("book") then
-                            addESP(obj, Color3.new(0.5, 0.8, 1), "BOOK", true)
+                        if obj.Name:find("Book") or obj.Name == "LibraryHintPaper" then
+                            addesp(obj, Color3.new(0.5, 0.8, 1), "BOOK", true)
                         end
                     end
                 end
             end
             
-            -- Lever ESP
+            -- levers
             if leversp then
                 local assets = room:FindFirstChild("Assets")
                 if assets then
                     for _, obj in pairs(assets:GetChildren()) do
-                        if obj.Name:lower():find("lever") then
-                            addESP(obj, Color3.new(0.8, 0.4, 1), "LEVER", true)
+                        if obj.Name:find("Lever") then
+                            addesp(obj, Color3.new(0.8, 0.4, 1), "LEVER", true)
                         end
                     end
                 end
             end
         end
     end
+    
+    -- scan workspace for other items
+    if coinesp then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj.Name == "GoldPile" or obj.Name:find("Coin") then
+                addesp(obj, Color3.new(1, 0.8, 0.2), "GOLD", true)
+            end
+        end
+    end
+    
+    if bookesp then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj.Name:find("Book") or obj.Name == "LibraryHintPaper" or obj.Name:find("Paper") then
+                addesp(obj, Color3.new(0.5, 0.8, 1), "BOOK", true)
+            end
+        end
+    end
 end
 
+-- set scroll size (bigger canvas for proper scrolling)
+scroll.CanvasSize = UDim2.new(0, 0, 0, 450)
+
 -- main loop
-local lastScan = 0
+local lastesp = 0
 rs.Heartbeat:Connect(function()
     local now = tick()
     
-    -- Scan for ESP every 2 seconds
-    if now - lastScan > 2 then
-        pcall(scanForESP)
-        lastScan = now
+    if now - lastesp > 0.5 then
+        scanesp()
+        lastesp = now
     end
     
     local char = plr.Character
     if not char then return end
     
-    -- Noclip
     if noclip then
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") and part.CanCollide and part.Name ~= "HumanoidRootPart" then
@@ -419,15 +590,43 @@ rs.Heartbeat:Connect(function()
         end
     end
     
-    -- Godmode
+    if fly then
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local bv = root and root:FindFirstChild("BodyVelocity")
+        
+        if bv then
+            local move = Vector3.new(0, 0, 0)
+            local flyspeed = 50
+            
+            if uis:IsKeyDown(Enum.KeyCode.W) then
+                move = move + (workspace.Camera.CoordinateFrame.LookVector * flyspeed)
+            end
+            if uis:IsKeyDown(Enum.KeyCode.S) then
+                move = move - (workspace.Camera.CoordinateFrame.LookVector * flyspeed)
+            end
+            if uis:IsKeyDown(Enum.KeyCode.A) then
+                move = move - (workspace.Camera.CoordinateFrame.RightVector * flyspeed)
+            end
+            if uis:IsKeyDown(Enum.KeyCode.D) then
+                move = move + (workspace.Camera.CoordinateFrame.RightVector * flyspeed)
+            end
+            if uis:IsKeyDown(Enum.KeyCode.Space) then
+                move = move + Vector3.new(0, flyspeed, 0)
+            end
+            if uis:IsKeyDown(Enum.KeyCode.LeftShift) then
+                move = move - Vector3.new(0, flyspeed, 0)
+            end
+            
+            bv.Velocity = move
+        end
+    end
+    
     if god then
         local hum = char:FindFirstChild("Humanoid")
-        if hum and hum.Health < hum.MaxHealth then
+        if hum and hum.Health then
             hum.Health = hum.MaxHealth
         end
     end
 end)
 
-print("✓ Main loop started")
-print("=== DOORS HACK LOADED SUCCESSFULLY ===")
-print("Look for a dark GUI with DOORS HACK title!")
+print("doors hack loaded - mobile drag + more esp items")
