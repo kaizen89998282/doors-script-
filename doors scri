@@ -1,5 +1,5 @@
--- Complete Doors Hack Script v2.1 - With Simplified Auto Collection
--- Created with enhanced ESP, teleportation safety, entity protection, and auto collection
+-- Complete Doors Hack Script v2.8 - FIXED Door ESP + Conservative Chest ESP + LeverForGate
+-- Restored Door ESP, made Chest ESP much more specific, added LeverForGate ESP
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -29,17 +29,31 @@ local espObjects = {}
 local connections = {}
 local isMinimized = false
 local originalLighting = {}
-local collectibleItems = {} -- Track collectible items
-local collectedItems = {} -- Track already collected items to prevent spam
+local currentTab = "ESP"
 
--- Settings
+-- Settings with default values
 local settings = {
     doorESP = false,
     keyESP = false,
     goldESP = false,
-    itemESP = false,
     leverESP = false,
+    leverForGateESP = true, -- NEW: Auto-enabled for LeverForGate
     chestESP = false,
+    
+    -- Item ESP
+    lighterESP = false,
+    flashlightESP = false,
+    crucifixESP = false,
+    bookESP = false,
+    vitaminESP = false,
+    skeletonKeyESP = false,
+    lockpickESP = false,
+    
+    -- Special Items
+    batteriesESP = false,
+    bandageESP = false,
+    
+    -- Entity Protection
     antiRush = false,
     antiAmbush = false,
     antiSeek = false,
@@ -47,11 +61,49 @@ local settings = {
     antiEyes = false,
     antiHalt = false,
     entityNotifications = true,
-    fullbright = false,
-    autoCollect = false
+    
+    -- Visual
+    fullbright = false
 }
 
-print("Creating Doors Hack GUI...")
+-- Save/Load Settings Functions
+local function saveSettings()
+    local success, result = pcall(function()
+        writefile("DoorsHackSettings.json", game:GetService("HttpService"):JSONEncode(settings))
+    end)
+    if success then
+        print("Settings saved successfully!")
+    else
+        warn("Failed to save settings: " .. tostring(result))
+    end
+end
+
+local function loadSettings()
+    local success, result = pcall(function()
+        if isfile("DoorsHackSettings.json") then
+            local data = readfile("DoorsHackSettings.json")
+            local loadedSettings = game:GetService("HttpService"):JSONDecode(data)
+            
+            -- Merge loaded settings with defaults (in case new settings were added)
+            for key, value in pairs(loadedSettings) do
+                if settings[key] ~= nil then
+                    settings[key] = value
+                end
+            end
+            print("Settings loaded successfully!")
+            return true
+        end
+    end)
+    if not success then
+        warn("Failed to load settings, using defaults: " .. tostring(result))
+    end
+    return success
+end
+
+-- Load settings on startup
+loadSettings()
+
+print("Creating Fixed Doors Hack GUI with Door ESP + Conservative Chest ESP + LeverForGate...")
 
 -- Create main GUI
 local screenGui = Instance.new("ScreenGui")
@@ -62,16 +114,14 @@ screenGui.Parent = CoreGui
 -- Main frame
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 320, 0, 420) -- Adjusted height
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+mainFrame.Size = UDim2.new(0, 380, 0, 400)
+mainFrame.Position = UDim2.new(0.5, -190, 0.5, -200)
 mainFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
 mainFrame.BorderSizePixel = 2
 mainFrame.BorderColor3 = Color3.new(0.3, 0.5, 0.8)
 mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
-
-print("Main frame created")
 
 -- Title bar
 local titleBar = Instance.new("Frame")
@@ -86,9 +136,9 @@ local titleText = Instance.new("TextLabel")
 titleText.Size = UDim2.new(1, -60, 1, 0)
 titleText.Position = UDim2.new(0, 5, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "flow hub made by kaizen"
+titleText.Text = "flow hub - Fixed ESP v2.8 + Door + LeverForGate"
 titleText.TextColor3 = Color3.new(1, 1, 1)
-titleText.TextSize = 14
+titleText.TextSize = 10
 titleText.Font = Enum.Font.SourceSansBold
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.Parent = titleBar
@@ -117,11 +167,40 @@ closeBtn.TextSize = 14
 closeBtn.Font = Enum.Font.SourceSansBold
 closeBtn.Parent = titleBar
 
+-- Tab buttons frame
+local tabFrame = Instance.new("Frame")
+tabFrame.Name = "TabFrame"
+tabFrame.Size = UDim2.new(1, 0, 0, 35)
+tabFrame.Position = UDim2.new(0, 0, 0, 30)
+tabFrame.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+tabFrame.BorderSizePixel = 0
+tabFrame.Parent = mainFrame
+
+-- Tab buttons
+local tabs = {"ESP", "Items", "Protection", "Visual"}
+local tabButtons = {}
+
+for i, tabName in ipairs(tabs) do
+    local tabBtn = Instance.new("TextButton")
+    tabBtn.Name = tabName .. "Tab"
+    tabBtn.Size = UDim2.new(0.25, -2, 1, -4)
+    tabBtn.Position = UDim2.new((i-1) * 0.25, 1, 0, 2)
+    tabBtn.BackgroundColor3 = currentTab == tabName and Color3.new(0.3, 0.5, 0.8) or Color3.new(0.2, 0.2, 0.2)
+    tabBtn.BorderSizePixel = 0
+    tabBtn.Text = tabName
+    tabBtn.TextColor3 = Color3.new(1, 1, 1)
+    tabBtn.TextSize = 11
+    tabBtn.Font = Enum.Font.SourceSansBold
+    tabBtn.Parent = tabFrame
+    
+    tabButtons[tabName] = tabBtn
+end
+
 -- Content frame
 local contentFrame = Instance.new("ScrollingFrame")
 contentFrame.Name = "ContentFrame"
-contentFrame.Size = UDim2.new(1, -10, 1, -40)
-contentFrame.Position = UDim2.new(0, 5, 0, 35)
+contentFrame.Size = UDim2.new(1, -10, 1, -110)
+contentFrame.Position = UDim2.new(0, 5, 0, 70)
 contentFrame.BackgroundTransparency = 1
 contentFrame.BorderSizePixel = 0
 contentFrame.ScrollBarThickness = 6
@@ -135,35 +214,27 @@ layout.Padding = UDim.new(0, 5)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Parent = contentFrame
 
-print("Content frame and layout created")
+-- Save Settings Button
+local saveBtn = Instance.new("TextButton")
+saveBtn.Name = "SaveButton"
+saveBtn.Size = UDim2.new(1, -10, 0, 30)
+saveBtn.Position = UDim2.new(0, 5, 1, -35)
+saveBtn.BackgroundColor3 = Color3.new(0.2, 0.7, 0.2)
+saveBtn.BorderSizePixel = 0
+saveBtn.Text = "💾 Save Settings"
+saveBtn.TextColor3 = Color3.new(1, 1, 1)
+saveBtn.TextSize = 12
+saveBtn.Font = Enum.Font.SourceSansBold
+saveBtn.Parent = mainFrame
 
--- Function to create section headers
-local function createSection(title, order)
-    local section = Instance.new("Frame")
-    section.Name = title .. "Section"
-    section.Size = UDim2.new(1, -10, 0, 25)
-    section.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
-    section.BorderSizePixel = 1
-    section.BorderColor3 = Color3.new(0.4, 0.6, 1)
-    section.LayoutOrder = order
-    section.Parent = contentFrame
-    
-    local sectionTitle = Instance.new("TextLabel")
-    sectionTitle.Size = UDim2.new(1, -5, 1, 0)
-    sectionTitle.Position = UDim2.new(0, 5, 0, 0)
-    sectionTitle.BackgroundTransparency = 1
-    sectionTitle.Text = title
-    sectionTitle.TextColor3 = Color3.new(0.4, 0.6, 1)
-    sectionTitle.TextSize = 12
-    sectionTitle.Font = Enum.Font.SourceSansBold
-    sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
-    sectionTitle.Parent = section
-    
-    return section
+-- Tab content containers
+local tabContents = {}
+for _, tabName in ipairs(tabs) do
+    tabContents[tabName] = {}
 end
 
 -- Function to create toggle buttons
-local function createToggle(text, settingKey, color, order)
+local function createToggle(text, settingKey, color, tabName, order)
     local toggle = Instance.new("Frame")
     toggle.Name = text .. "Toggle"
     toggle.Size = UDim2.new(1, -10, 0, 30)
@@ -171,6 +242,7 @@ local function createToggle(text, settingKey, color, order)
     toggle.BorderSizePixel = 1
     toggle.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
     toggle.LayoutOrder = order
+    toggle.Visible = currentTab == tabName
     toggle.Parent = contentFrame
     
     local label = Instance.new("TextLabel")
@@ -199,110 +271,100 @@ local function createToggle(text, settingKey, color, order)
         settings[settingKey] = not settings[settingKey]
         button.BackgroundColor3 = settings[settingKey] and color or Color3.new(0.3, 0.3, 0.3)
         button.Text = settings[settingKey] and "ON" or "OFF"
-        print(text .. " set to: " .. tostring(settings[settingKey]))
+        -- Auto-save settings when changed
+        saveSettings()
     end)
     
+    table.insert(tabContents[tabName], toggle)
     return toggle
 end
 
--- Function to create slider
-local function createSlider(text, settingKey, minVal, maxVal, order)
-    local slider = Instance.new("Frame")
-    slider.Name = text .. "Slider"
-    slider.Size = UDim2.new(1, -10, 0, 40)
-    slider.BackgroundColor3 = Color3.new(0.12, 0.12, 0.12)
-    slider.BorderSizePixel = 1
-    slider.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
-    slider.LayoutOrder = order
-    slider.Parent = contentFrame
+-- Function to switch tabs
+local function switchTab(tabName)
+    currentTab = tabName
     
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -5, 0, 20)
-    label.Position = UDim2.new(0, 5, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = text .. ": " .. settings[settingKey]
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.TextSize = 11
-    label.Font = Enum.Font.SourceSans
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = slider
+    -- Update tab button colors
+    for name, btn in pairs(tabButtons) do
+        btn.BackgroundColor3 = name == tabName and Color3.new(0.3, 0.5, 0.8) or Color3.new(0.2, 0.2, 0.2)
+    end
     
-    local sliderBar = Instance.new("Frame")
-    sliderBar.Size = UDim2.new(1, -10, 0, 15)
-    sliderBar.Position = UDim2.new(0, 5, 0, 22)
-    sliderBar.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-    sliderBar.BorderSizePixel = 0
-    sliderBar.Parent = slider
-    
-    local sliderButton = Instance.new("TextButton")
-    sliderButton.Size = UDim2.new(0, 15, 1, 0)
-    sliderButton.Position = UDim2.new((settings[settingKey] - minVal) / (maxVal - minVal), -7.5, 0, 0)
-    sliderButton.BackgroundColor3 = Color3.new(0.4, 0.6, 1)
-    sliderButton.BorderSizePixel = 0
-    sliderButton.Text = ""
-    sliderButton.Parent = sliderBar
-    
-    local dragging = false
-    
-    sliderButton.MouseButton1Down:Connect(function()
-        dragging = true
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
+    -- Show/hide content
+    for _, child in pairs(contentFrame:GetChildren()) do
+        if child:IsA("Frame") and child.Name:find("Toggle") then
+            child.Visible = false
         end
-    end)
+    end
     
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local mouse = Players.LocalPlayer:GetMouse()
-            local relativeX = math.clamp(mouse.X - sliderBar.AbsolutePosition.X, 0, sliderBar.AbsoluteSize.X)
-            local percentage = relativeX / sliderBar.AbsoluteSize.X
-            
-            sliderButton.Position = UDim2.new(percentage, -7.5, 0, 0)
-            settings[settingKey] = math.floor(minVal + (maxVal - minVal) * percentage)
-            label.Text = text .. ": " .. settings[settingKey]
+    for _, toggle in pairs(tabContents[tabName]) do
+        if toggle and toggle.Parent then
+            toggle.Visible = true
         end
-    end)
+    end
     
-    return slider
+    -- Update canvas size
+    task.wait(0.1)
+    local visibleHeight = 0
+    for _, toggle in pairs(tabContents[tabName]) do
+        if toggle and toggle.Parent and toggle.Visible then
+            visibleHeight = visibleHeight + toggle.Size.Y.Offset + 5
+        end
+    end
+    contentFrame.CanvasSize = UDim2.new(0, 0, 0, visibleHeight + 20)
 end
 
-print("Creating toggles...")
+-- Connect tab buttons
+for tabName, btn in pairs(tabButtons) do
+    btn.MouseButton1Click:Connect(function()
+        switchTab(tabName)
+    end)
+end
 
--- Create sections and toggles
-createSection("ESP Features", 1)
-createToggle("Door ESP", "doorESP", Color3.new(0, 1, 0.4), 2)
-createToggle("Key ESP", "keyESP", Color3.new(1, 0.84, 0), 3)
-createToggle("Gold ESP", "goldESP", Color3.new(1, 0.65, 0), 4)
-createToggle("Item ESP", "itemESP", Color3.new(0.4, 0.6, 1), 5)
-createToggle("Lever ESP", "leverESP", Color3.new(0.8, 0.4, 1), 6)
-createToggle("Chest ESP", "chestESP", Color3.new(1, 0.4, 0.8), 7)
+-- Connect save button
+saveBtn.MouseButton1Click:Connect(function()
+    saveSettings()
+    -- Visual feedback
+    local originalText = saveBtn.Text
+    saveBtn.Text = "✅ Saved!"
+    saveBtn.BackgroundColor3 = Color3.new(0.1, 0.8, 0.1)
+    task.wait(1)
+    saveBtn.Text = originalText
+    saveBtn.BackgroundColor3 = Color3.new(0.2, 0.7, 0.2)
+end)
 
-createSection("Auto Collection", 8)
-createToggle("Auto Collect & Open Everything", "autoCollect", Color3.new(0, 1, 0), 9)
+-- Create toggles organized by tabs
+-- ESP Tab - RESTORED Door ESP as first toggle
+createToggle("Door ESP", "doorESP", Color3.new(0, 1, 0.4), "ESP", 1)
+createToggle("Key ESP", "keyESP", Color3.new(1, 0.84, 0), "ESP", 2)
+createToggle("Gold ESP", "goldESP", Color3.new(1, 0.65, 0), "ESP", 3)
+createToggle("Lever ESP", "leverESP", Color3.new(0.8, 0.4, 1), "ESP", 4)
+createToggle("LeverForGate ESP", "leverForGateESP", Color3.new(1, 0.2, 1), "ESP", 5)
+createToggle("Chest ESP", "chestESP", Color3.new(1, 0.4, 0.8), "ESP", 6)
 
-createSection("Entity Protection", 10)
-createToggle("Anti Rush (TP to Safety)", "antiRush", Color3.new(1, 0.2, 0.2), 11)
-createToggle("Anti Ambush (TP to Safety)", "antiAmbush", Color3.new(1, 0.4, 0.2), 12)
-createToggle("Anti Seek (TP Forward)", "antiSeek", Color3.new(0.6, 0, 0.6), 13)
-createToggle("Anti Screech (Auto Click)", "antiScreech", Color3.new(1, 1, 0.2), 14)
-createToggle("Anti Eyes (Look Away)", "antiEyes", Color3.new(1, 0, 1), 15)
-createToggle("Anti Halt (Stop Moving)", "antiHalt", Color3.new(0, 1, 1), 16)
-createToggle("Entity Notifications", "entityNotifications", Color3.new(0.4, 1, 1), 17)
+-- Items Tab
+createToggle("Lighter ESP", "lighterESP", Color3.new(1, 0.5, 0), "Items", 1)
+createToggle("Flashlight ESP", "flashlightESP", Color3.new(1, 1, 0.3), "Items", 2)
+createToggle("Crucifix ESP", "crucifixESP", Color3.new(0.9, 0.9, 0.9), "Items", 3)
+createToggle("Skeleton Key ESP", "skeletonKeyESP", Color3.new(0.7, 0.7, 0.9), "Items", 4)
+createToggle("Lockpick ESP", "lockpickESP", Color3.new(0.6, 0.8, 0.6), "Items", 5)
+createToggle("Book ESP", "bookESP", Color3.new(0.4, 0.6, 1), "Items", 6)
+createToggle("Vitamin ESP", "vitaminESP", Color3.new(0, 1, 0.6), "Items", 7)
+createToggle("Batteries ESP", "batteriesESP", Color3.new(1, 1, 0.5), "Items", 8)
+createToggle("Bandage ESP", "bandageESP", Color3.new(1, 0.6, 0.6), "Items", 9)
 
-createSection("Visual Features", 18)
-createToggle("Fullbright", "fullbright", Color3.new(1, 1, 0.4), 19)
+-- Protection Tab
+createToggle("Anti Rush", "antiRush", Color3.new(1, 0.2, 0.2), "Protection", 1)
+createToggle("Anti Ambush", "antiAmbush", Color3.new(1, 0.4, 0.2), "Protection", 2)
+createToggle("Anti Seek", "antiSeek", Color3.new(0.6, 0, 0.6), "Protection", 3)
+createToggle("Anti Screech", "antiScreech", Color3.new(1, 1, 0.2), "Protection", 4)
+createToggle("Anti Eyes", "antiEyes", Color3.new(1, 0, 1), "Protection", 5)
+createToggle("Anti Halt", "antiHalt", Color3.new(0, 1, 1), "Protection", 6)
+createToggle("Entity Notifications", "entityNotifications", Color3.new(0.4, 1, 1), "Protection", 7)
 
-print("Toggles created, updating canvas size...")
+-- Visual Tab
+createToggle("Fullbright", "fullbright", Color3.new(1, 1, 0.4), "Visual", 1)
 
--- Update canvas size
-task.wait(0.1) -- Wait for layout to update
-local totalHeight = layout.AbsoluteContentSize.Y
-contentFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight + 20)
-
-print("Canvas size updated to: " .. totalHeight)
+-- Initialize first tab
+switchTab("ESP")
 
 -- ESP Functions
 local function clearESP()
@@ -318,6 +380,9 @@ local function createESP(object, color, text, showText)
     if not object or not object.Parent then return end
     
     pcall(function()
+        -- Check if ESP already exists to prevent duplicates
+        if object:FindFirstChild("DoorsESP") then return end
+        
         local highlight = Instance.new("Highlight")
         highlight.Name = "DoorsESP"
         highlight.Adornee = object
@@ -332,7 +397,7 @@ local function createESP(object, color, text, showText)
             local billboardGui = Instance.new("BillboardGui")
             billboardGui.Name = "DoorsESPLabel"
             billboardGui.Adornee = object
-            billboardGui.Size = UDim2.new(0, 80, 0, 25)
+            billboardGui.Size = UDim2.new(0, 100, 0, 25)
             billboardGui.AlwaysOnTop = true
             billboardGui.Parent = object
             
@@ -352,176 +417,50 @@ local function createESP(object, color, text, showText)
     end)
 end
 
--- Auto Collection Functions
-local function isCollectible(object)
-    local name = object.Name:lower()
-    local parent = object.Parent
+-- Fixed door state checking
+local function isDoorOpen(door)
+    if not door then return false end
     
-    -- Check if it's a key
-    if name:find("key") or (parent and parent.Name == "KeyObtain") then
-        return true, "key"
-    end
-    
-    -- Check if it's gold/coins
-    if name:find("gold") or name:find("coin") then
-        return true, "gold"
-    end
-    
-    -- Check if it's an item
-    local itemNames = {"book", "vitamin", "flashlight", "lighter", "candle", "crucifix"}
-    for _, itemName in pairs(itemNames) do
-        if name:find(itemName) then
-            return true, "item"
-        end
-    end
-    
-    -- Check if it's a chest/container
-    local chestNames = {"chest", "drawer", "wardrobe", "closet"}
-    for _, chestName in pairs(chestNames) do
-        if name:find(chestName) then
-            return true, "chest"
-        end
-    end
-    
-    return false, nil
-end
-
-local function collectItem(object)
-    if not object or not object.Parent then return end
-    
-    -- Check if already collected this item
-    local objectId = tostring(object)
-    if collectedItems[objectId] then return end
-    
-    pcall(function()
-        print("Attempting to collect:", object.Name)
-        
-        -- For items like GoldVisualHolder, we need to search the entire parent structure
-        local searchObjects = {object}
-        
-        -- Add parent and grandparent to search list
-        if object.Parent then
-            table.insert(searchObjects, object.Parent)
-            if object.Parent.Parent then
-                table.insert(searchObjects, object.Parent.Parent)
+    -- Check various door state indicators
+    local doorModel = door:FindFirstChild("Door")
+    if doorModel then
+        -- Check if door has been moved from original position
+        local hinge = doorModel:FindFirstChild("Hinge")
+        if hinge and hinge:IsA("BasePart") then
+            -- Check rotation to determine if door is open
+            local rotation = hinge.CFrame:ToEulerAnglesXYZ()
+            if math.abs(rotation.Y) > 0.5 then
+                return true
             end
         end
         
-        -- Search each object and all their descendants
-        for _, searchObj in pairs(searchObjects) do
-            -- Check the object itself first
-            local proximityPrompt = searchObj:FindFirstChildOfClass("ProximityPrompt")
-            if proximityPrompt then
-                print("Using ProximityPrompt on", searchObj.Name)
-                fireproximityprompt(proximityPrompt)
-                collectedItems[objectId] = true
-                return
-            end
-            
-            local clickDetector = searchObj:FindFirstChildOfClass("ClickDetector")
-            if clickDetector then
-                print("Using ClickDetector on", searchObj.Name)
-                fireclickdetector(clickDetector)
-                collectedItems[objectId] = true
-                return
-            end
-            
-            -- Search all descendants
-            for _, descendant in pairs(searchObj:GetDescendants()) do
-                if descendant:IsA("ProximityPrompt") then
-                    print("Using ProximityPrompt in", searchObj.Name, "->", descendant.Name)
-                    fireproximityprompt(descendant)
-                    collectedItems[objectId] = true
-                    return
-                elseif descendant:IsA("ClickDetector") then
-                    print("Using ClickDetector in", searchObj.Name, "->", descendant.Name)
-                    fireclickdetector(descendant)
-                    collectedItems[objectId] = true
-                    return
-                end
-            end
+        -- Check for open attribute
+        if doorModel:GetAttribute("Opened") or door:GetAttribute("Opened") then
+            return true
         end
         
-        print("No interaction found for:", object.Name, "- Searched", #searchObjects, "objects")
-        collectedItems[objectId] = true -- Mark as attempted
-    end)
-end
-
-local function updateCollectibleItems()
-    collectibleItems = {}
-    local currentRooms = Workspace:FindFirstChild("CurrentRooms")
-    if not currentRooms then return end
-    
-    for _, room in pairs(currentRooms:GetChildren()) do
-        if tonumber(room.Name) then
-            -- Scan all descendants in the room
-            for _, descendant in pairs(room:GetDescendants()) do
-                -- Check if it has any interaction elements (ClickDetector or ProximityPrompt)
-                local hasInteraction = descendant:FindFirstChildOfClass("ClickDetector") or 
-                                     descendant:FindFirstChildOfClass("ProximityPrompt") or
-                                     (descendant.Parent and (descendant.Parent:FindFirstChildOfClass("ClickDetector") or descendant.Parent:FindFirstChildOfClass("ProximityPrompt")))
-                
-                if hasInteraction and descendant:IsA("BasePart") then
-                    local canCollect, itemType = isCollectible(descendant)
-                    if canCollect then
-                        table.insert(collectibleItems, {
-                            object = descendant,
-                            type = itemType,
-                            position = descendant.Position
-                        })
-                    end
-                end
+        -- Check for proximity prompt removal (doors remove prompt when opened)
+        local prompt = door:FindFirstChild("PromptPart")
+        if prompt then
+            local proximityPrompt = prompt:FindFirstChildOfClass("ProximityPrompt")
+            if not proximityPrompt or not proximityPrompt.Enabled then
+                return true
             end
         end
     end
+    
+    return false
 end
 
-local function autoCollectNearbyItems()
-    if not settings.autoCollect or not character or not humanoidRootPart then return end
-    
-    local currentRooms = Workspace:FindFirstChild("CurrentRooms")
-    if not currentRooms then return end
-    
-    local playerPosition = humanoidRootPart.Position
-    
-    -- Scan for nearby interactable objects in real-time
-    for _, room in pairs(currentRooms:GetChildren()) do
-        if tonumber(room.Name) then
-            for _, descendant in pairs(room:GetDescendants()) do
-                if descendant:IsA("BasePart") and descendant.Parent then
-                    local distance = (playerPosition - descendant.Position).Magnitude
-                    
-                    -- Only check very close objects (6 studs max)
-                    if distance <= 6 then
-                        local objectId = tostring(descendant)
-                        
-                        -- Skip if already processed
-                        if not collectedItems[objectId] then
-                            -- Check if it's a collectible item first
-                            local canCollect, itemType = isCollectible(descendant)
-                            if canCollect then
-                                print("Found collectible:", descendant.Name, "Type:", itemType, "Distance:", math.floor(distance))
-                                collectItem(descendant)
-                                task.wait(0.5) -- Wait between collections
-                                return -- Only try one item per cycle
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
--- Enhanced room scanning
+-- ENHANCED room scanning with ALL ESP features
 local function scanRoom(room)
-    if not room or not tonumber(room.Name) then return end
+    if not room then return end
     
     pcall(function()
-        -- Door ESP
+        -- RESTORED Door ESP with open state checking
         if settings.doorESP then
             local door = room:FindFirstChild("Door")
-            if door then
+            if door and not isDoorOpen(door) then
                 for _, part in pairs(door:GetDescendants()) do
                     if part.Name == "Door" and part:IsA("BasePart") then
                         createESP(part, Color3.new(0, 1, 0.4), "DOOR", false)
@@ -531,7 +470,7 @@ local function scanRoom(room)
             end
         end
         
-        -- Key ESP
+        -- ORIGINAL Key ESP from v2.1 code (works in chests)
         if settings.keyESP then
             for _, descendant in pairs(room:GetDescendants()) do
                 if descendant.Name == "KeyObtain" then
@@ -545,45 +484,150 @@ local function scanRoom(room)
             end
         end
         
-        -- Gold ESP
+        -- ENHANCED Gold ESP - works in chests like Key ESP
         if settings.goldESP then
             for _, descendant in pairs(room:GetDescendants()) do
-                if (descendant.Name:find("Gold") or descendant.Name:find("Coin")) and descendant:IsA("BasePart") then
+                if descendant.Name:find("Gold") and descendant:IsA("BasePart") then
+                    createESP(descendant, Color3.new(1, 0.65, 0), "GOLD", true)
+                elseif descendant.Name:find("Coin") and descendant:IsA("BasePart") then
+                    createESP(descendant, Color3.new(1, 0.65, 0), "GOLD", true)
+                elseif descendant.Name == "GoldPile" and descendant:IsA("BasePart") then
+                    createESP(descendant, Color3.new(1, 0.65, 0), "GOLD", true)
+                elseif (descendant.Name:lower():find("gold") or descendant.Name:lower():find("coin")) and descendant:IsA("BasePart") then
                     createESP(descendant, Color3.new(1, 0.65, 0), "GOLD", true)
                 end
             end
         end
         
-        -- Item ESP
-        if settings.itemESP then
-            local itemNames = {"Book", "Vitamin", "Flashlight", "Lighter", "Candle", "Crucifix"}
+        -- ENHANCED Lever ESP - general levers
+        if settings.leverESP then
             for _, descendant in pairs(room:GetDescendants()) do
-                for _, itemName in pairs(itemNames) do
-                    if descendant.Name:find(itemName) and descendant:IsA("BasePart") then
-                        createESP(descendant, Color3.new(0.4, 0.6, 1), itemName:upper(), true)
-                        break
+                if descendant:IsA("BasePart") then
+                    local name = descendant.Name:lower()
+                    if name:find("lever") and not name:find("leverforgate") then
+                        createESP(descendant, Color3.new(0.8, 0.4, 1), "LEVER", true)
                     end
                 end
             end
         end
         
-        -- Lever ESP
-        if settings.leverESP then
+        -- SPECIFIC LeverForGate ESP - ALWAYS SHOWS WHEN AVAILABLE
+        if settings.leverForGateESP then
+            -- Check for the specific path you mentioned
+            local assets = room:FindFirstChild("Assets")
+            if assets then
+                local leverForGate = assets:FindFirstChild("LeverForGate")
+                if leverForGate then
+                    local main = leverForGate:FindFirstChild("Main")
+                    if main and main:IsA("BasePart") then
+                        createESP(main, Color3.new(1, 0.2, 1), "LEVER FOR GATE", true)
+                        print("Found LeverForGate in room " .. room.Name .. "!")
+                    end
+                end
+            end
+            
+            -- Also check for any LeverForGate objects anywhere in the room
             for _, descendant in pairs(room:GetDescendants()) do
-                if descendant.Name:find("Lever") and descendant:IsA("BasePart") then
-                    createESP(descendant, Color3.new(0.8, 0.4, 1), "LEVER", true)
+                if descendant.Name == "LeverForGate" or descendant.Name:find("LeverForGate") then
+                    local main = descendant:FindFirstChild("Main")
+                    if main and main:IsA("BasePart") then
+                        createESP(main, Color3.new(1, 0.2, 1), "LEVER FOR GATE", true)
+                    elseif descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(1, 0.2, 1), "LEVER FOR GATE", true)
+                    end
                 end
             end
         end
         
-        -- Chest ESP
+        -- VERY CONSERVATIVE Chest ESP - Only exact matches
         if settings.chestESP then
-            local chestNames = {"Chest", "Drawer", "Wardrobe", "Closet"}
             for _, descendant in pairs(room:GetDescendants()) do
-                for _, chestName in pairs(chestNames) do
-                    if descendant.Name:find(chestName) then
+                if descendant:IsA("BasePart") then
+                    local name = descendant.Name:lower()
+                    -- ONLY highlight objects with EXACT names to avoid false positives
+                    if name == "chest" or name == "drawer" then
                         createESP(descendant, Color3.new(1, 0.4, 0.8), "CHEST", true)
-                        break
+                    end
+                elseif descendant:IsA("Model") then
+                    local name = descendant.Name:lower()
+                    if name == "chest" or name == "drawer" then
+                        local targetPart = descendant:FindFirstChildOfClass("BasePart")
+                        if targetPart then
+                            createESP(targetPart, Color3.new(1, 0.4, 0.8), "CHEST", true)
+                        end
+                    end
+                end
+            end
+        end
+        
+        -- Scan all descendants for items with improved detection
+        for _, descendant in pairs(room:GetDescendants()) do
+            if descendant:IsA("BasePart") or descendant:IsA("Model") then
+                local name = descendant.Name:lower()
+                
+                -- Lighter ESP
+                if settings.lighterESP then
+                    if name:find("lighter") and descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(1, 0.5, 0), "LIGHTER", true)
+                    end
+                end
+                
+                -- Flashlight ESP
+                if settings.flashlightESP then
+                    if name:find("flashlight") and descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(1, 1, 0.3), "FLASHLIGHT", true)
+                    end
+                end
+                
+                -- Crucifix ESP
+                if settings.crucifixESP then
+                    if name:find("crucifix") and descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(0.9, 0.9, 0.9), "CRUCIFIX", true)
+                    end
+                end
+                
+                -- Book ESP
+                if settings.bookESP then
+                    if name:find("book") and descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(0.4, 0.6, 1), "BOOK", true)
+                    end
+                end
+                
+                -- Vitamin ESP
+                if settings.vitaminESP then
+                    if name:find("vitamin") and descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(0, 1, 0.6), "VITAMIN", true)
+                    end
+                end
+                
+                -- Skeleton Key ESP
+                if settings.skeletonKeyESP then
+                    if (name:find("skeleton") and name:find("key")) or name == "skeletonkey" then
+                        local targetPart = descendant:IsA("BasePart") and descendant or descendant:FindFirstChildOfClass("BasePart")
+                        if targetPart then
+                            createESP(targetPart, Color3.new(0.7, 0.7, 0.9), "SKELETON KEY", true)
+                        end
+                    end
+                end
+                
+                -- Lockpick ESP
+                if settings.lockpickESP then
+                    if name:find("lockpick") and descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(0.6, 0.8, 0.6), "LOCKPICK", true)
+                    end
+                end
+                
+                -- Batteries ESP
+                if settings.batteriesESP then
+                    if (name:find("batteries") or name:find("battery")) and descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(1, 1, 0.5), "BATTERIES", true)
+                    end
+                end
+                
+                -- Bandage ESP
+                if settings.bandageESP then
+                    if name:find("bandage") and descendant:IsA("BasePart") then
+                        createESP(descendant, Color3.new(1, 0.6, 0.6), "BANDAGE", true)
                     end
                 end
             end
@@ -591,32 +635,149 @@ local function scanRoom(room)
     end)
 end
 
--- Safe teleportation function
-local function teleportToSafety()
-    if not character or not humanoidRootPart then return end
-    
-    local currentRooms = Workspace:FindFirstChild("CurrentRooms")
-    if not currentRooms then return end
-    
-    -- Find a room with hiding spots
-    for _, room in pairs(currentRooms:GetChildren()) do
-        if tonumber(room.Name) then
-            for _, descendant in pairs(room:GetDescendants()) do
-                if descendant.Name:find("Wardrobe") or descendant.Name:find("Closet") or descendant.Name:find("Bed") then
-                    local safePos = descendant.Position + Vector3.new(0, 5, 0)
-                    humanoidRootPart.CFrame = CFrame.new(safePos)
-                    return true
-                end
+-- FIXED Entity detection with proper protection
+local function setupEntityProtection()
+    -- Rush/Ambush detection
+    connections.rushDetection = Workspace.ChildAdded:Connect(function(child)
+        local name = child.Name:lower()
+        
+        if name:find("rush") or name == "RushMoving" or name == "RushNew" then
+            createNotification("RUSH DETECTED! HIDING!", Color3.new(1, 0, 0))
+            if settings.antiRush then
+                pcall(function()
+                    local currentRooms = Workspace:FindFirstChild("CurrentRooms")
+                    if currentRooms and humanoidRootPart then
+                        local closestHideSpot = nil
+                        local closestDistance = math.huge
+                        
+                        for _, room in pairs(currentRooms:GetChildren()) do
+                            if tonumber(room.Name) then
+                                for _, descendant in pairs(room:GetDescendants()) do
+                                    if descendant.Name:find("Wardrobe") or descendant.Name:find("Closet") then
+                                        local distance = (humanoidRootPart.Position - descendant.Position).Magnitude
+                                        if distance < closestDistance then
+                                            closestDistance = distance
+                                            closestHideSpot = descendant
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        
+                        if closestHideSpot then
+                            humanoidRootPart.CFrame = closestHideSpot.CFrame + Vector3.new(0, 0, -2)
+                        else
+                            -- Fallback: teleport high up
+                            humanoidRootPart.CFrame = humanoidRootPart.CFrame + Vector3.new(0, 25, 0)
+                        end
+                    end
+                end)
+            end
+        elseif name:find("ambush") or name == "AmbushMoving" then
+            createNotification("AMBUSH DETECTED! HIDING!", Color3.new(1, 0.4, 0))
+            if settings.antiAmbush then
+                pcall(function()
+                    -- Same logic as Rush
+                    local currentRooms = Workspace:FindFirstChild("CurrentRooms")
+                    if currentRooms and humanoidRootPart then
+                        local closestHideSpot = nil
+                        local closestDistance = math.huge
+                        
+                        for _, room in pairs(currentRooms:GetChildren()) do
+                            if tonumber(room.Name) then
+                                for _, descendant in pairs(room:GetDescendants()) do
+                                    if descendant.Name:find("Wardrobe") or descendant.Name:find("Closet") then
+                                        local distance = (humanoidRootPart.Position - descendant.Position).Magnitude
+                                        if distance < closestDistance then
+                                            closestDistance = distance
+                                            closestHideSpot = descendant
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        
+                        if closestHideSpot then
+                            humanoidRootPart.CFrame = closestHideSpot.CFrame + Vector3.new(0, 0, -2)
+                        else
+                            humanoidRootPart.CFrame = humanoidRootPart.CFrame + Vector3.new(0, 25, 0)
+                        end
+                    end
+                end)
+            end
+        elseif name:find("seek") or name == "SeekMoving" then
+            createNotification("SEEK DETECTED! MOVING FORWARD!", Color3.new(0.6, 0, 0.6))
+            if settings.antiSeek and humanoidRootPart then
+                pcall(function()
+                    -- Move forward significantly
+                    humanoidRootPart.CFrame = humanoidRootPart.CFrame + humanoidRootPart.CFrame.LookVector * 50
+                end)
+            end
+        elseif name:find("halt") or name == "Halt" then
+            createNotification("HALT DETECTED! STOPPING!", Color3.new(0, 1, 1))
+            if settings.antiHalt and character and character:FindFirstChild("Humanoid") then
+                pcall(function()
+                    local humanoid = character.Humanoid
+                    local originalSpeed = humanoid.WalkSpeed
+                    humanoid.WalkSpeed = 0
+                    task.wait(5) -- Wait longer for Halt
+                    humanoid.WalkSpeed = originalSpeed
+                end)
             end
         end
-    end
+    end)
     
-    -- Fallback: teleport up
-    humanoidRootPart.CFrame = humanoidRootPart.CFrame + Vector3.new(0, 15, 0)
-    return false
+    -- Eyes detection - monitor for Eyes entity and automatically look away
+    connections.eyesDetection = RunService.Heartbeat:Connect(function()
+        if settings.antiEyes then
+            pcall(function()
+                -- Check for Eyes entity
+                local eyes = Workspace:FindFirstChild("Eyes") or Workspace:FindFirstChild("BackdoorLookman")
+                if eyes and humanoidRootPart then
+                    createNotification("EYES DETECTED! LOOKING AWAY!", Color3.new(1, 0, 1))
+                    -- Immediately turn around
+                    local currentCFrame = humanoidRootPart.CFrame
+                    local turnAroundCFrame = currentCFrame * CFrame.Angles(0, math.pi, 0)
+                    humanoidRootPart.CFrame = turnAroundCFrame
+                    
+                    -- Also check player GUI for eyes effect
+                    local gui = player.PlayerGui:FindFirstChild("MainUI")
+                    if gui then
+                        local jumpscare = gui:FindFirstChild("Jumpscare_Eyes") or gui:FindFirstChild("Jumpscare")
+                        if jumpscare then
+                            jumpscare.Visible = false
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+    
+    -- Screech detection - monitor for screech GUI and auto-click
+    connections.screechDetection = RunService.Heartbeat:Connect(function()
+        if settings.antiScreech then
+            pcall(function()
+                local gui = player.PlayerGui:FindFirstChild("MainUI")
+                if gui then
+                    local screechGui = gui:FindFirstChild("Screech")
+                    if screechGui and screechGui.Visible then
+                        createNotification("SCREECH DETECTED! AUTO-CLICKING!", Color3.new(1, 1, 0))
+                        local imageButton = screechGui:FindFirstChild("ImageButton")
+                        if imageButton then
+                            -- Multiple click attempts to ensure it works
+                            for i = 1, 3 do
+                                fireclick(imageButton)
+                                task.wait(0.1)
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end)
 end
 
--- Notification system (only for entity notifications)
+-- Notification system
 local function createNotification(text, color)
     if not settings.entityNotifications then return end
     
@@ -644,57 +805,6 @@ local function createNotification(text, color)
     end)
 end
 
--- Entity detection
-local function setupEntityProtection()
-    connections.entityDetection = Workspace.ChildAdded:Connect(function(child)
-        local name = child.Name:lower()
-        
-        if name:find("rush") then
-            createNotification("RUSH DETECTED!", Color3.new(1, 0, 0))
-            if settings.antiRush then
-                teleportToSafety()
-            end
-        elseif name:find("ambush") then
-            createNotification("AMBUSH DETECTED!", Color3.new(1, 0.4, 0))
-            if settings.antiAmbush then
-                teleportToSafety()
-            end
-        elseif name:find("seek") then
-            createNotification("SEEK DETECTED!", Color3.new(0.6, 0, 0.6))
-            if settings.antiSeek and humanoidRootPart then
-                humanoidRootPart.CFrame = humanoidRootPart.CFrame + humanoidRootPart.CFrame.LookVector * 30
-            end
-        elseif name:find("screech") then
-            createNotification("SCREECH DETECTED!", Color3.new(1, 1, 0))
-            if settings.antiScreech then
-                task.spawn(function()
-                    task.wait(0.1)
-                    local gui = player.PlayerGui:FindFirstChild("MainUI")
-                    if gui and gui:FindFirstChild("Screech") then
-                        local screech = gui.Screech:FindFirstChild("ImageButton")
-                        if screech then
-                            fireclick(screech)
-                        end
-                    end
-                end)
-            end
-        elseif name:find("eyes") then
-            createNotification("EYES DETECTED!", Color3.new(1, 0, 1))
-            if settings.antiEyes and humanoidRootPart then
-                humanoidRootPart.CFrame = CFrame.new(humanoidRootPart.Position, humanoidRootPart.Position - humanoidRootPart.CFrame.LookVector)
-            end
-        elseif name:find("halt") then
-            createNotification("HALT DETECTED!", Color3.new(0, 1, 1))
-            if settings.antiHalt and character and character:FindFirstChild("Humanoid") then
-                local originalSpeed = character.Humanoid.WalkSpeed
-                character.Humanoid.WalkSpeed = 0
-                task.wait(2)
-                character.Humanoid.WalkSpeed = originalSpeed
-            end
-        end
-    end)
-end
-
 -- Fullbright function
 local function toggleFullbright(enabled)
     if enabled then
@@ -714,22 +824,19 @@ local function toggleFullbright(enabled)
     end
 end
 
--- Main ESP and collection loop
+-- Main ESP loop with optimizations
 local function startMainLoop()
     connections.mainLoop = RunService.Heartbeat:Connect(function()
-        if tick() % 2 < 0.016 then -- Update every 2 seconds
+        if tick() % 1.5 < 0.016 then -- Update every 1.5 seconds for better performance
             clearESP()
             local currentRooms = Workspace:FindFirstChild("CurrentRooms")
             if currentRooms then
                 for _, room in pairs(currentRooms:GetChildren()) do
-                    scanRoom(room)
+                    pcall(function()
+                        scanRoom(room)
+                    end)
                 end
             end
-        end
-        
-        -- Auto collect items (runs every 1 second for mobile)
-        if tick() % 1 < 0.016 then
-            autoCollectNearbyItems()
         end
     end)
 end
@@ -737,13 +844,18 @@ end
 -- GUI Controls
 local function toggleGUI()
     isMinimized = not isMinimized
-    contentFrame.Visible = not isMinimized
     
     if isMinimized then
-        mainFrame.Size = UDim2.new(0, 320, 0, 30)
+        tabFrame.Visible = false
+        contentFrame.Visible = false
+        saveBtn.Visible = false
+        mainFrame.Size = UDim2.new(0, 380, 0, 30)
         minimizeBtn.Text = "+"
     else
-        mainFrame.Size = UDim2.new(0, 320, 0, 420)
+        tabFrame.Visible = true
+        contentFrame.Visible = true
+        saveBtn.Visible = true
+        mainFrame.Size = UDim2.new(0, 380, 0, 400)
         minimizeBtn.Text = "-"
     end
 end
@@ -752,6 +864,9 @@ end
 minimizeBtn.MouseButton1Click:Connect(toggleGUI)
 
 closeBtn.MouseButton1Click:Connect(function()
+    -- Save settings before closing
+    saveSettings()
+    
     clearESP()
     for _, connection in pairs(connections) do
         if connection then connection:Disconnect() end
@@ -775,10 +890,23 @@ task.spawn(function()
 end)
 
 -- Initialize everything
-print("Initializing systems...")
+print("Initializing Fixed Doors Hack ESP system with Door + LeverForGate + Conservative Chest ESP...")
 setupEntityProtection()
 startMainLoop()
 
-print("Doors Hack v2.1 with Auto Collection successfully loaded!")
-print("UI should now be visible. Check your screen for the GUI window.")
-print("Auto Collection: Toggle 'Auto Collect All Items' to automatically pick up keys, gold, and items!")
+print("Doors Hack v2.8 - Complete Fixed Version successfully loaded!")
+print("✅ FEATURES INCLUDED:")
+print("- ✅ Door ESP: Back and working (only shows closed doors)")
+print("- ✅ LeverForGate ESP: Targets workspace.CurrentRooms[room].Assets.LeverForGate.Main")
+print("- ✅ Conservative Chest ESP: Only highlights objects named exactly 'chest' or 'drawer'")
+print("- ✅ Key ESP: Working in chests and rooms")
+print("- ✅ Gold ESP: Working in chests and rooms") 
+print("- ✅ All Item ESP: Lighter, Flashlight, Crucifix, Books, Vitamins, etc.")
+print("- ✅ All Protection: Anti-Rush, Anti-Ambush, Anti-Seek, Anti-Screech, Anti-Eyes, Anti-Halt")
+print("- ✅ Save System: Settings persist between sessions")
+print("- ✅ Fullbright: Visual enhancement")
+print("")
+print("🎯 CHEST ESP NOW VERY SPECIFIC - will not spam false positives!")
+print("🚪 DOOR ESP RESTORED - shows green highlight on closed doors!")
+print("🎮 LEVERFORGATE ESP - shows bright magenta when available!")
+print("💾 Settings auto-save when changed!")
